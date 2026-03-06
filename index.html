@@ -870,6 +870,46 @@ function salvarConfig() {
   document.getElementById('login-screen').classList.add('open');
 }
 
+// ── Autenticação
+async function fazerLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  errEl.textContent = '';
+  if (!email || !senha) { errEl.textContent = 'Preencha e-mail e senha.'; return; }
+  btn.textContent = 'Entrando...'; btn.disabled = true;
+  try {
+    const res = await fetch(SB_URL + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: senha })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error_description || data.msg || 'Credenciais inválidas');
+    localStorage.setItem('cdl_token', data.access_token);
+    localStorage.setItem('cdl_user_email', email);
+    SB_TOKEN = data.access_token;
+    document.getElementById('login-screen').classList.remove('open');
+    document.getElementById('header-usuario').textContent = email.split('@')[0];
+    await iniciar();
+  } catch(e) {
+    errEl.textContent = e.message || 'Erro ao fazer login. Tente novamente.';
+  }
+  btn.textContent = 'Entrar →'; btn.disabled = false;
+}
+
+function fazerLogout() {
+  localStorage.removeItem('cdl_token');
+  localStorage.removeItem('cdl_user_email');
+  SB_TOKEN = '';
+  document.getElementById('header-usuario').textContent = '';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-senha').value = '';
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('login-screen').classList.add('open');
+}
+
 // ═══════════════════════════════════════════════════
 //  ESTADO LOCAL (cache dos dados)
 // ═══════════════════════════════════════════════════
