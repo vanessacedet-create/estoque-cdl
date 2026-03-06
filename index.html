@@ -28,6 +28,39 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); min-height: 100vh; }
 
+  /* LOGIN SCREEN */
+  #login-screen {
+    display: none; position: fixed; inset: 0;
+    background: var(--navy); z-index: 8500;
+    align-items: center; justify-content: center;
+  }
+  #login-screen.open { display: flex; }
+  .login-box {
+    background: #fff; border-radius: 16px; padding: 44px 40px;
+    max-width: 400px; width: 92%;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+    animation: modalIn .25s ease;
+  }
+  .login-logo { font-family: 'Fraunces', serif; font-size: 1.8rem; color: var(--navy); font-weight: 700; margin-bottom: 4px; }
+  .login-logo span { color: var(--gold); }
+  .login-sub { font-size: .85rem; color: var(--muted); margin-bottom: 32px; }
+  .login-field { margin-bottom: 16px; }
+  .login-field label { display: block; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 6px; }
+  .login-field input {
+    width: 100%; padding: 12px 14px; border: 1.5px solid var(--border);
+    border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: .95rem;
+    color: var(--text); transition: border-color .15s;
+  }
+  .login-field input:focus { outline: none; border-color: var(--navy); }
+  .login-btn {
+    width: 100%; background: var(--navy); color: #fff; border: none;
+    border-radius: 8px; padding: 13px; font-family: 'DM Sans', sans-serif;
+    font-size: .95rem; font-weight: 600; cursor: pointer; margin-top: 8px;
+    transition: background .15s; letter-spacing: .02em;
+  }
+  .login-btn:hover { background: var(--navy2); }
+  .login-error { color: var(--red); font-size: .82rem; margin-top: 10px; text-align: center; min-height: 20px; }
+
   /* SETUP SCREEN */
   #setup-screen {
     display: none;
@@ -314,6 +347,24 @@
 </head>
 <body>
 
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Estoque <span>CDL</span></div>
+    <p class="login-sub">Faça login para acessar o sistema.</p>
+    <div class="login-field">
+      <label>E-mail</label>
+      <input type="email" id="login-email" placeholder="seu@email.com" onkeydown="if(event.key==='Enter')fazerLogin()">
+    </div>
+    <div class="login-field">
+      <label>Senha</label>
+      <input type="password" id="login-senha" placeholder="••••••••" onkeydown="if(event.key==='Enter')fazerLogin()">
+    </div>
+    <button class="login-btn" onclick="fazerLogin()" id="login-btn">Entrar →</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
 <!-- SETUP SCREEN -->
 <div id="setup-screen" class="open">
   <div class="setup-box">
@@ -377,11 +428,15 @@ CREATE TABLE historico (
       <div class="conn-dot"></div>
       <span>Online</span>
     </div>
+    <span id="header-usuario" style="color:rgba(255,255,255,.55);font-size:.78rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+    <button onclick="fazerLogout()" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);border-radius:6px;padding:5px 12px;font-family:'DM Sans',sans-serif;font-size:.75rem;cursor:pointer;">Sair</button>
     <nav class="nav-tabs">
       <button class="nav-tab active"  onclick="showSection('estoque',this)">📦 Estoque</button>
       <button class="nav-tab" onclick="showSection('scanner',this)">🔫 Venda Rápida</button>
       <button class="nav-tab" onclick="showSection('movimentos',this)">↕ Movimentos</button>
       <button class="nav-tab" onclick="showSection('historico',this)">📋 Histórico</button>
+      <button class="nav-tab" onclick="showSection('relatorio',this)">📊 Relatório</button>
+      <button class="nav-tab" onclick="showSection('produtos',this)">➕ Produtos</button>
       <button class="nav-tab" onclick="showSection('alertas',this)">🔔 Alertas</button>
       <button class="nav-tab" onclick="showSection('inicial',this)">⚙ Estoque Inicial</button>
     </nav>
@@ -398,75 +453,131 @@ CREATE TABLE historico (
 
   <!-- VENDA RÁPIDA / SCANNER -->
   <section class="section" id="sec-scanner">
-    <div class="section-title">🔫 Venda Rápida</div>
-    <div class="section-sub">Aponte o leitor para o código de barras do livro para registrar a venda automaticamente.</div>
 
-    <div class="form-grid">
-      <!-- Painel do scanner -->
-      <div class="form-card" style="border-top: 4px solid var(--gold);">
-        <h3>📷 Leitura do Código</h3>
-        <p class="form-desc">Clique no campo abaixo e use o leitor de código de barras. O livro será identificado automaticamente.</p>
-
-        <div class="form-group">
-          <label>Campo de Leitura</label>
-          <input type="text" id="scanner-input"
-            placeholder="Aponte o leitor aqui e leia o código..."
-            oninput="onScannerInput()"
-            onkeydown="onScannerKey(event)"
-            autocomplete="off" autocorrect="off" spellcheck="false"
-            style="font-size:1.1rem;font-weight:600;letter-spacing:.05em;background:#fffef5;border-color:var(--gold)">
-        </div>
-
-        <!-- Preview do livro identificado -->
-        <div id="scanner-preview" class="preview-box" style="min-height:100px">
-          <span>Aguardando leitura do código de barras...</span>
-        </div>
-
-        <br>
-        <!-- Formulário de confirmação (aparece após leitura) -->
-        <div id="scanner-form" style="display:none">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Quantidade</label>
-              <input type="number" id="scanner-qtd" min="1" value="1"
-                style="font-size:1.2rem;font-weight:700;text-align:center">
-            </div>
-            <div class="form-group">
-              <label>Data</label>
-              <input type="date" id="scanner-data">
-            </div>
-          </div>
+    <!-- PASSO 1: ESCOLHER COLÉGIO -->
+    <div id="scan-step-colegio">
+      <div class="section-title">🔫 Venda Rápida</div>
+      <div class="section-sub">Informe o colégio para iniciar o passeio.</div>
+      <div style="max-width:480px">
+        <div class="form-card" style="border-top:4px solid var(--gold)">
+          <h3>🏫 Qual é o colégio?</h3>
+          <p class="form-desc">Todos os pedidos deste passeio serão vinculados a este colégio.</p>
           <div class="form-group">
             <label>Colégio / Turma</label>
-            <input type="text" id="scanner-colegio" list="colegios-list" placeholder="Ex: Colégio São Paulo - 3º ano">
+            <input type="text" id="scan-colegio-input" list="colegios-list"
+              placeholder="Ex: Colégio São Paulo - 3º ano"
+              onkeydown="if(event.key==='Enter')iniciarPasseio()"
+              style="font-size:1rem">
             <datalist id="colegios-list"></datalist>
           </div>
-          <button class="btn-primary danger" onclick="confirmarVendaScanner()" id="scanner-btn-confirmar">
-            ✔ Confirmar Venda
-          </button>
-          <button class="btn-secondary" onclick="limparScanner()" style="width:100%;margin-top:8px">
-            ✕ Cancelar / Nova leitura
-          </button>
-        </div>
-      </div>
-
-      <!-- Últimas vendas da sessão -->
-      <div class="form-card">
-        <h3>🧾 Vendas desta sessão</h3>
-        <p class="form-desc">Registros feitos desde que você abriu o sistema.</p>
-        <div id="scanner-session-list" style="display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto">
-          <div class="empty-state" style="padding:24px">
-            <div class="emoji">🛒</div>
-            <p>Nenhuma venda ainda</p>
+          <div class="form-group">
+            <label>Data do passeio</label>
+            <input type="date" id="scan-data-input">
           </div>
-        </div>
-        <div id="scanner-session-total" style="display:none;margin-top:16px;padding:12px 16px;background:var(--green-light);border-radius:8px;text-align:center">
-          <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--green);font-weight:600">Total da sessão</div>
-          <div style="font-family:'Fraunces',serif;font-size:1.6rem;font-weight:700;color:var(--green)" id="scanner-total-valor">R$ 0,00</div>
-          <div style="font-size:.78rem;color:var(--muted)" id="scanner-total-livros">0 livros vendidos</div>
+          <button class="btn-primary" onclick="iniciarPasseio()" style="background:var(--gold);color:var(--navy)">
+            Iniciar Passeio →
+          </button>
         </div>
       </div>
     </div>
+
+    <!-- PASSO 2: PEDIDO DO ALUNO -->
+    <div id="scan-step-aluno" style="display:none">
+      <!-- Cabeçalho do passeio -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600">Passeio em andamento</div>
+          <div style="font-family:'Fraunces',serif;font-size:1.4rem;font-weight:700;color:var(--navy)" id="scan-header-colegio"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="background:var(--navy);color:var(--gold);padding:6px 16px;border-radius:20px;font-family:'Fraunces',serif;font-weight:700;font-size:1rem" id="scan-aluno-badge">Aluno 1</div>
+          <button class="btn-outline danger" onclick="encerrarPasseio()" style="font-size:.78rem;padding:6px 14px">Encerrar Passeio</button>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <!-- Leitor -->
+        <div class="form-card" style="border-top:4px solid var(--gold)">
+          <h3>📷 Leitura do Código</h3>
+          <p class="form-desc">Aponte o leitor para o código de barras. O livro entra na lista automaticamente.</p>
+          <div class="form-group">
+            <input type="text" id="scanner-input"
+              placeholder="Aponte o leitor aqui..."
+              oninput="onScannerInput()"
+              onkeydown="onScannerKey(event)"
+              autocomplete="off" autocorrect="off" spellcheck="false"
+              style="font-size:1.05rem;font-weight:600;letter-spacing:.05em;background:#fffef5;border-color:var(--gold)">
+          </div>
+          <!-- Feedback rápido da leitura -->
+          <div id="scanner-feedback" style="min-height:60px;display:flex;align-items:center;justify-content:center;border-radius:8px;padding:12px;font-size:.88rem;color:var(--muted);background:var(--cream);transition:all .2s">
+            Aguardando leitura...
+          </div>
+          <br>
+          <!-- Ajuste de quantidade do último item lido -->
+          <div id="scanner-qtd-wrap" style="display:none">
+            <div class="form-row" style="align-items:flex-end">
+              <div class="form-group" style="margin-bottom:0">
+                <label>Qtd do último livro</label>
+                <input type="number" id="scanner-qtd" min="1" value="1"
+                  style="font-size:1.1rem;font-weight:700;text-align:center"
+                  oninput="atualizarQtdUltimo()">
+              </div>
+              <button class="btn-outline" onclick="focarScanner()" style="margin-bottom:0;white-space:nowrap">
+                ← Nova leitura
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Carrinho do aluno atual -->
+        <div class="form-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <h3 id="scan-cart-title">🛒 Pedido — Aluno 1</h3>
+          </div>
+          <p class="form-desc" id="scan-cart-desc">Livros lidos até agora para este aluno.</p>
+
+          <div id="scan-cart-list" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto;margin-bottom:16px">
+            <div class="empty-state" style="padding:20px">
+              <div class="emoji">📚</div>
+              <p>Nenhum livro ainda — leia o código de barras</p>
+            </div>
+          </div>
+
+          <!-- Total do aluno -->
+          <div id="scan-cart-total" style="display:none;padding:14px 16px;background:var(--cream);border-radius:10px;margin-bottom:14px;text-align:center">
+            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600">Total do pedido</div>
+            <div style="font-family:'Fraunces',serif;font-size:2rem;font-weight:700;color:var(--navy)" id="scan-cart-total-val">R$ 0,00</div>
+            <div style="font-size:.78rem;color:var(--muted)" id="scan-cart-total-qtd">0 livro(s)</div>
+          </div>
+
+          <button class="btn-primary success" id="scan-btn-salvar" style="display:none" onclick="salvarPedidoAluno()">
+            💾 Salvar Pedido e Próximo Aluno
+          </button>
+          <div style="font-size:.75rem;color:var(--muted);text-align:center;margin-top:8px" id="scan-alunos-count"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASSO 3: RESUMO DO PASSEIO -->
+    <div id="scan-step-resumo" style="display:none">
+      <div class="section-title">✅ Resumo do Passeio</div>
+      <div class="section-sub" id="resumo-sub"></div>
+
+      <div id="resumo-list" style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px"></div>
+
+      <!-- Total geral -->
+      <div style="background:var(--navy);color:#fff;border-radius:14px;padding:24px;text-align:center;margin-bottom:24px">
+        <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);font-weight:600;margin-bottom:8px">Total Geral do Passeio</div>
+        <div style="font-family:'Fraunces',serif;font-size:2.5rem;font-weight:700;color:var(--gold)" id="resumo-total-val"></div>
+        <div style="font-size:.85rem;color:rgba(255,255,255,.6);margin-top:4px" id="resumo-total-info"></div>
+      </div>
+
+      <div style="display:flex;gap:12px;max-width:500px">
+        <button class="btn-secondary" onclick="voltarParaAlunos()" style="flex:1">← Adicionar mais um aluno</button>
+        <button class="btn-primary success" onclick="finalizarPasseio()" style="flex:1">✅ Finalizar e Fechar</button>
+      </div>
+    </div>
+
   </section>
 
   <!-- ESTOQUE -->
@@ -494,7 +605,7 @@ CREATE TABLE historico (
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>SKU</th><th>Título</th><th>Preço CDL</th><th>Estoque</th><th>Status</th><th>Ações</th></tr></thead>
+        <thead><tr><th>SKU</th><th>Título</th><th>ISBN</th><th>Tipo</th><th>Preço CDL</th><th>Estoque</th><th>Status</th><th>Ações</th></tr></thead>
         <tbody id="tbody-estoque"></tbody>
       </table>
     </div>
@@ -551,6 +662,137 @@ CREATE TABLE historico (
     <div class="hist-list" id="hist-list"></div>
   </section>
 
+  <!-- RELATÓRIO -->
+  <section class="section" id="sec-relatorio">
+    <div class="section-title">📊 Relatório de Vendas</div>
+    <div class="section-sub">Filtre e exporte as vendas em Excel.</div>
+    <div class="form-grid" style="margin-bottom:24px">
+      <div class="form-card">
+        <h3>🔎 Filtros</h3>
+        <p class="form-desc">Selecione os filtros desejados e clique em Gerar Relatório.</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Data inicial</label>
+            <input type="date" id="rel-data-ini">
+          </div>
+          <div class="form-group">
+            <label>Data final</label>
+            <input type="date" id="rel-data-fim">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Colégio (deixe em branco para todos)</label>
+          <input type="text" id="rel-colegio" list="colegios-list" placeholder="Todos os colégios">
+        </div>
+        <div class="form-group">
+          <label>Produto (deixe em branco para todos)</label>
+          <select id="rel-produto">
+            <option value="">Todos os produtos</option>
+          </select>
+        </div>
+        <button class="btn-primary" onclick="gerarRelatorio()" style="margin-bottom:8px">🔍 Gerar Relatório</button>
+        <button class="btn-outline" onclick="exportarRelatorioXLSX()" id="btn-exportar-rel" style="width:100%;display:none">⬇ Exportar Excel (.xlsx)</button>
+      </div>
+      <div class="form-card">
+        <h3>📈 Resumo</h3>
+        <p class="form-desc">Totais do período filtrado.</p>
+        <div id="rel-resumo" style="display:flex;flex-direction:column;gap:12px">
+          <div class="empty-state" style="padding:24px"><div class="emoji">📊</div><p>Gere um relatório para ver o resumo</p></div>
+        </div>
+      </div>
+    </div>
+    <!-- Tabela de resultados -->
+    <div id="rel-tabela-wrap" style="display:none">
+      <div class="section-label" style="margin-bottom:12px">Detalhamento das Vendas</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Data</th><th>Colégio</th><th>Obs (Aluno)</th><th>Produto</th><th>Tipo</th><th>Qtd</th><th>Preço CDL</th><th>Total</th></tr></thead>
+          <tbody id="rel-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRODUTOS -->
+  <section class="section" id="sec-produtos">
+    <div class="section-title">➕ Gerenciar Produtos</div>
+    <div class="section-sub">Cadastre novos produtos individualmente ou importe em massa por planilha Excel.</div>
+    <div class="form-grid">
+      <!-- Cadastro individual -->
+      <div class="form-card">
+        <h3>📝 Novo Produto</h3>
+        <p class="form-desc">Preencha os dados e clique em Cadastrar.</p>
+        <div class="form-row">
+          <div class="form-group">
+            <label>SKU *</label>
+            <input type="number" id="prod-sku" placeholder="Ex: 36800">
+          </div>
+          <div class="form-group">
+            <label>Tipo *</label>
+            <select id="prod-tipo">
+              <option value="Livro">Livro</option>
+              <option value="Revista">Revista</option>
+              <option value="Kit">Kit</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Nome *</label>
+          <input type="text" id="prod-nome" placeholder="Nome do produto">
+        </div>
+        <div class="form-group">
+          <label>ISBN</label>
+          <input type="text" id="prod-isbn" placeholder="Ex: 9786585310123" maxlength="13">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Preço de Capa (R$) *</label>
+            <input type="number" id="prod-preco-capa" step="0.01" min="0" placeholder="0,00">
+          </div>
+          <div class="form-group">
+            <label>Preço CDL (R$) *</label>
+            <input type="number" id="prod-preco-cdl" step="0.01" min="0" placeholder="0,00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Quantidade inicial em estoque</label>
+          <input type="number" id="prod-qtd" min="0" value="0">
+        </div>
+        <button class="btn-primary success" onclick="cadastrarProduto()">✔ Cadastrar Produto</button>
+      </div>
+
+      <!-- Importação em massa -->
+      <div class="form-card">
+        <h3>📂 Importar Planilha Excel</h3>
+        <p class="form-desc">Suba um arquivo .xlsx com múltiplos produtos de uma vez.</p>
+
+        <!-- Modelo para download -->
+        <div style="background:var(--cream);border-radius:10px;padding:16px;margin-bottom:16px">
+          <div style="font-size:.78rem;font-weight:600;color:var(--navy);margin-bottom:6px">📋 Formato esperado da planilha:</div>
+          <div style="font-size:.75rem;color:var(--muted);line-height:1.8;font-family:monospace">
+            SKU | Nome | ISBN | Tipo | Preço de Capa | Preço CDL | Quantidade
+          </div>
+          <button class="btn-outline" onclick="baixarModeloXLSX()" style="margin-top:10px;width:100%;font-size:.82rem">⬇ Baixar Modelo (.xlsx)</button>
+        </div>
+
+        <div class="form-group">
+          <label>Selecionar arquivo .xlsx</label>
+          <input type="file" id="prod-file" accept=".xlsx,.xls"
+            style="padding:8px;border:1.5px dashed var(--border);border-radius:8px;cursor:pointer;width:100%"
+            onchange="previewImportacao(this)">
+        </div>
+
+        <!-- Preview da importação -->
+        <div id="import-preview" style="display:none">
+          <div id="import-preview-info" style="font-size:.82rem;color:var(--muted);margin-bottom:10px"></div>
+          <div id="import-preview-list" style="max-height:180px;overflow-y:auto;font-size:.78rem;display:flex;flex-direction:column;gap:4px;margin-bottom:12px"></div>
+          <button class="btn-primary success" onclick="confirmarImportacao()" id="btn-confirmar-import">✔ Importar Produtos</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ALERTAS -->
   <section class="section" id="sec-alertas">
     <div class="section-title">Alertas de Estoque</div>
@@ -601,14 +843,14 @@ LIVROS.forEach(l => { if(l.isbn) ISBN_INDEX[l.isbn] = l; });
 // ═══════════════════════════════════════════════════
 //  SUPABASE
 // ═══════════════════════════════════════════════════
-let SB_URL = '', SB_KEY = '';
+let SB_URL = '', SB_KEY = '', SB_TOKEN = '';
 
 function sbFetch(path, opts={}) {
   return fetch(SB_URL + '/rest/v1/' + path, {
     ...opts,
     headers: {
       'apikey': SB_KEY,
-      'Authorization': 'Bearer ' + SB_KEY,
+      'Authorization': 'Bearer ' + (SB_TOKEN || SB_KEY),
       'Content-Type': 'application/json',
       'Prefer': opts.prefer || 'return=representation',
       ...(opts.headers||{})
@@ -624,7 +866,8 @@ function salvarConfig() {
   SB_URL = url; SB_KEY = key;
   localStorage.setItem('cdl_sb_url', url);
   localStorage.setItem('cdl_sb_key', key);
-  iniciar();
+  document.getElementById('setup-screen').classList.remove('open');
+  document.getElementById('login-screen').classList.add('open');
 }
 
 // ═══════════════════════════════════════════════════
@@ -670,7 +913,7 @@ async function carregarEstoque() {
   if (!res.ok) throw new Error('Erro estoque');
   const data = await res.json();
   estoque = {};
-  LIVROS.forEach(l => estoque[l.sku] = 0);
+  todosProdutos().forEach(l => estoque[l.sku] = 0);
   data.forEach(r => estoque[r.sku] = r.quantidade);
 }
 
@@ -688,7 +931,7 @@ async function upsertEstoque(sku, qtd) {
 //  SUPABASE: HISTÓRICO
 // ═══════════════════════════════════════════════════
 async function carregarHistorico() {
-  const res = await sbFetch('historico?select=*&order=criado_em.desc&limit=300');
+  const res = await sbFetch('historico?select=*&order=criado_em.desc&limit=500');
   if (!res.ok) throw new Error('Erro histórico');
   historico = await res.json();
 }
@@ -708,7 +951,7 @@ async function inserirHistorico(mov) {
 // ═══════════════════════════════════════════════════
 function renderInicial() {
   const q = (document.getElementById('search-init').value||'').toLowerCase();
-  const livros = LIVROS.filter(l => !q || l.nome.toLowerCase().includes(q) || String(l.sku).includes(q));
+  const livros = todosProdutos().filter(l => !q || l.nome.toLowerCase().includes(q) || String(l.sku).includes(q));
   document.getElementById('init-grid').innerHTML = livros.map(l => `
     <div class="init-item">
       <div style="flex:1;min-width:0">
@@ -723,7 +966,7 @@ function renderInicial() {
 }
 
 function zerarTodos() {
-  LIVROS.forEach(l => {
+  todosProdutos().forEach(l => {
     const inp = document.getElementById('init-'+l.sku);
     if (inp) inp.value = 0;
   });
@@ -733,7 +976,7 @@ async function salvarEstoqueInicial() {
   const btn = document.querySelector('#sec-inicial .btn-primary');
   btn.textContent = '⏳ Salvando...'; btn.disabled = true;
   try {
-    const ops = LIVROS.map(l => {
+    const ops = todosProdutos().map(l => {
       const v = parseInt(document.getElementById('init-'+l.sku)?.value)||0;
       return { sku: l.sku, quantidade: v };
     });
@@ -760,9 +1003,9 @@ function renderEstoque() {
   const q = (document.getElementById('search-estoque').value||'').toLowerCase();
   const f = document.getElementById('filter-estoque').value;
   const fp = document.getElementById('filter-preco').value;
-  let livros = LIVROS.filter(l => {
+  let livros = todosProdutos().filter(l => {
     const e = estoque[l.sku]||0;
-    if (q && !l.nome.toLowerCase().includes(q) && !String(l.sku).includes(q)) return false;
+    if (q && !l.nome.toLowerCase().includes(q) && !String(l.sku).includes(q) && !(l.isbn||'').includes(q)) return false;
     if (f === 'ok' && e === 0) return false;
     if (f === 'baixo' && (e === 0 || e > 3)) return false;
     if (f === 'zero' && e !== 0) return false;
@@ -770,14 +1013,17 @@ function renderEstoque() {
     return true;
   });
   const tbody = document.getElementById('tbody-estoque');
-  if (!livros.length) { tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state"><div class="emoji">📭</div><p>Nenhum livro encontrado</p></div></td></tr>`; return; }
+  if (!livros.length) { tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="emoji">📭</div><p>Nenhum produto encontrado</p></div></td></tr>`; return; }
   tbody.innerHTML = livros.map(l => {
     const e = estoque[l.sku]||0;
     const cls = e===0?'zero':e<=3?'baixo':'ok';
     const badge = e===0?'<span class="badge badge-zero">Sem estoque</span>':e<=3?'<span class="badge badge-baixo">Baixo</span>':'<span class="badge badge-ok">OK</span>';
+    const tipo = l.tipo || 'Livro';
     return `<tr>
       <td class="td-sku">${l.sku}</td>
       <td class="td-nome">${l.nome}</td>
+      <td style="font-family:monospace;font-size:.75rem;color:var(--muted)">${l.isbn||'—'}</td>
+      <td><span class="badge badge-ok" style="font-size:.65rem;background:var(--cream2);color:var(--navy)">${tipo}</span></td>
       <td class="td-preco">R$ ${l.precoCDL.toFixed(2).replace('.',',')}</td>
       <td class="estoque-${cls}" style="font-weight:700">${e}</td>
       <td>${badge}</td>
@@ -793,7 +1039,7 @@ function renderEstoque() {
 // ═══════════════════════════════════════════════════
 let pendingMove = null;
 function quickMove(sku, tipo) {
-  const livro = LIVROS.find(l=>l.sku===sku);
+  const livro = todosProdutos().find(l=>l.sku===sku);
   const e = estoque[sku]||0;
   if (tipo==='saida' && e===0) { showToast('Estoque zerado para este livro!','error'); return; }
   document.getElementById('modal-title').textContent = tipo==='entrada'?'Registrar Entrada':'Registrar Venda';
@@ -827,23 +1073,24 @@ async function confirmQuickMove() {
 // ═══════════════════════════════════════════════════
 function populateSelects() {
   ['entrada-livro','saida-livro'].forEach(id => {
-    document.getElementById(id).innerHTML = '<option value="">Selecione o livro...</option>' +
-      LIVROS.map(l=>`<option value="${l.sku}">${l.nome} — R$ ${l.precoCDL.toFixed(2).replace('.',',')}</option>`).join('');
+    document.getElementById(id).innerHTML = '<option value="">Selecione o produto...</option>' +
+      todosProdutos().map(l=>`<option value="${l.sku}">${l.nome} — R$ ${l.precoCDL.toFixed(2).replace('.',',')}</option>`).join('');
   });
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('entrada-data').value = today;
   document.getElementById('saida-data').value = today;
+  populateRelProduto();
 }
 
 function updatePreview(tipo) {
   const sku = parseInt(document.getElementById(`${tipo}-livro`).value);
   const box = document.getElementById(`preview-${tipo}`);
-  if (!sku) { box.className='preview-box'; box.innerHTML='Selecione um livro para ver os detalhes'; return; }
-  const l = LIVROS.find(x=>x.sku===sku);
+  if (!sku) { box.className='preview-box'; box.innerHTML='Selecione um produto para ver os detalhes'; return; }
+  const l = todosProdutos().find(x=>x.sku===sku);
   const e = estoque[sku]||0;
   const cls = e===0?'estoque-zero':e<=3?'estoque-baixo':'estoque-ok';
   box.className='preview-box filled';
-  box.innerHTML=`<div class="preview-nome">${l.nome}</div><div class="preview-info">SKU: ${l.sku} · CDL: R$ ${l.precoCDL.toFixed(2).replace('.',',')} · Capa: R$ ${l.precoCapa.toFixed(2).replace('.',',')}</div><div class="${cls}" style="font-weight:700;margin-top:6px">Estoque atual: ${e} un.</div>`;
+  box.innerHTML=`<div class="preview-nome">${l.nome}</div><div class="preview-info">SKU: ${l.sku} · CDL: R$ ${l.precoCDL.toFixed(2).replace('.',',')} · Capa: R$ ${(l.precoCapa||0).toFixed(2).replace('.',',')}</div><div class="${cls}" style="font-weight:700;margin-top:6px">Estoque atual: ${e} un.</div>`;
 }
 
 async function registrarMovimento(tipo) {
@@ -852,9 +1099,9 @@ async function registrarMovimento(tipo) {
   const data = document.getElementById(`${tipo}-data`).value;
   const obs = document.getElementById(`${tipo}-obs`)?.value||'';
   const colegio = document.getElementById('saida-colegio')?.value||'';
-  if (!sku) { showToast('Selecione um livro!','error'); return; }
+  if (!sku) { showToast('Selecione um produto!','error'); return; }
   if (qtd<1) { showToast('Quantidade deve ser maior que zero!','error'); return; }
-  const livro = LIVROS.find(l=>l.sku===sku);
+  const livro = todosProdutos().find(l=>l.sku===sku);
   const e = estoque[sku]||0;
   if (tipo==='saida'&&qtd>e) { showToast(`Estoque insuficiente! Disponível: ${e} un.`,'error'); return; }
   const novoQtd = tipo==='entrada'?e+qtd:e-qtd;
@@ -903,8 +1150,8 @@ function renderHistorico() {
 //  ALERTAS
 // ═══════════════════════════════════════════════════
 function renderAlertas() {
-  const zeros=LIVROS.filter(l=>(estoque[l.sku]||0)===0);
-  const baixos=LIVROS.filter(l=>{const e=estoque[l.sku]||0;return e>0&&e<=3;});
+  const zeros=todosProdutos().filter(l=>(estoque[l.sku]||0)===0);
+  const baixos=todosProdutos().filter(l=>{const e=estoque[l.sku]||0;return e>0&&e<=3;});
   const el=document.getElementById('alerts-grid');
   if(!zeros.length&&!baixos.length){el.innerHTML=`<div class="empty-state"><div class="emoji">✅</div><p>Nenhum alerta — estoque em dia!</p></div>`;return;}
   const render=(livros,tipo)=>livros.map(l=>{
@@ -923,10 +1170,11 @@ function renderAlertas() {
 //  STATS
 // ═══════════════════════════════════════════════════
 function updateStats() {
-  document.getElementById('stat-titulos').textContent=LIVROS.length;
-  document.getElementById('stat-unidades').textContent=LIVROS.reduce((s,l)=>s+(estoque[l.sku]||0),0);
-  document.getElementById('stat-baixo').textContent=LIVROS.filter(l=>{const e=estoque[l.sku]||0;return e>0&&e<=3;}).length;
-  document.getElementById('stat-zero').textContent=LIVROS.filter(l=>(estoque[l.sku]||0)===0).length;
+  const todos = todosProdutos();
+  document.getElementById('stat-titulos').textContent=todos.length;
+  document.getElementById('stat-unidades').textContent=todos.reduce((s,l)=>s+(estoque[l.sku]||0),0);
+  document.getElementById('stat-baixo').textContent=todos.filter(l=>{const e=estoque[l.sku]||0;return e>0&&e<=3;}).length;
+  document.getElementById('stat-zero').textContent=todos.filter(l=>(estoque[l.sku]||0)===0).length;
 }
 
 // ═══════════════════════════════════════════════════
@@ -954,7 +1202,22 @@ function showSection(id, btn) {
   if(id==='historico') renderHistorico();
   if(id==='alertas') renderAlertas();
   if(id==='inicial') renderInicial();
-  if(id==='scanner') { atualizarColégiosSugeridos(''); setTimeout(()=>document.getElementById('scanner-input')?.focus(),100); }
+  if(id==='relatorio') {
+    populateRelProduto();
+    atualizarColégiosSugeridos('');
+    const today = new Date().toISOString().split('T')[0];
+    const month = today.substring(0,8)+'01';
+    if(!document.getElementById('rel-data-ini').value) document.getElementById('rel-data-ini').value = month;
+    if(!document.getElementById('rel-data-fim').value) document.getElementById('rel-data-fim').value = today;
+  }
+  if(id==='produtos') {
+    salvarExtra(); // rebuild ISBN index
+  }
+  if(id==='scanner') {
+    atualizarColégiosSugeridos('');
+    document.getElementById('scan-data-input').value = new Date().toISOString().split('T')[0];
+    setTimeout(()=>document.getElementById('scan-colegio-input')?.focus(),100);
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -971,169 +1234,280 @@ function showToast(msg,type=''){
 }
 
 // ═══════════════════════════════════════════════════
-//  VENDA RÁPIDA — SCANNER
+//  VENDA RÁPIDA — PASSEIO POR COLÉGIO
 // ═══════════════════════════════════════════════════
-let scannerLivro = null;
-let sessionVendas = [];
+let passeio = null;
+// passeio = { colegio, data, alunos: [{itens:[{livro,qtd}]}], alunoAtual: 0 }
+
 let scannerTimer = null;
+let ultimoLido = null; // último livro adicionado ao carrinho
 
-// Leitores de código de barras digitam rápido + Enter
-// Detectamos pelo tempo entre teclas (< 50ms = scanner)
-let scanBuffer = '';
-let lastKeyTime = 0;
+function iniciarPasseio() {
+  const colegio = document.getElementById('scan-colegio-input').value.trim();
+  const data = document.getElementById('scan-data-input').value;
+  if (!colegio) { showToast('Informe o colégio!', 'error'); document.getElementById('scan-colegio-input').focus(); return; }
+  passeio = { colegio, data, alunos: [{ itens: [] }], alunoAtual: 0 };
+  atualizarColégiosSugeridos(colegio);
+  mostrarPassoAluno();
+}
 
+function mostrarPassoAluno() {
+  document.getElementById('scan-step-colegio').style.display = 'none';
+  document.getElementById('scan-step-resumo').style.display = 'none';
+  document.getElementById('scan-step-aluno').style.display = 'block';
+
+  const n = passeio.alunoAtual + 1;
+  document.getElementById('scan-header-colegio').textContent = passeio.colegio;
+  document.getElementById('scan-aluno-badge').textContent = `Aluno ${n}`;
+  document.getElementById('scan-cart-title').textContent = `🛒 Pedido — Aluno ${n}`;
+  document.getElementById('scan-cart-desc').textContent = `Livros lidos para o Aluno ${n}.`;
+  document.getElementById('scan-alunos-count').textContent =
+    passeio.alunos.length > 1 ? `${passeio.alunos.length - 1} aluno(s) já salvo(s) neste passeio` : '';
+
+  ultimoLido = null;
+  resetarFeedback();
+  renderCarrinho();
+  focarScanner();
+}
+
+function focarScanner() {
+  document.getElementById('scanner-input').value = '';
+  document.getElementById('scanner-input').focus();
+  document.getElementById('scanner-qtd-wrap').style.display = 'none';
+  ultimoLido = null;
+}
+
+function resetarFeedback() {
+  const fb = document.getElementById('scanner-feedback');
+  fb.style.background = 'var(--cream)';
+  fb.style.color = 'var(--muted)';
+  fb.textContent = 'Aguardando leitura...';
+}
+
+// ── Leitura do código
 function onScannerKey(e) {
-  const now = Date.now();
   if (e.key === 'Enter') {
     e.preventDefault();
-    const isbn = document.getElementById('scanner-input').value.trim();
-    if (isbn.length >= 8) processarISBN(isbn);
-    return;
+    const val = document.getElementById('scanner-input').value.trim();
+    if (val.length >= 8) processarISBN(val);
   }
-  // Acumula buffer para detectar leitura rápida do scanner
-  if (now - lastKeyTime < 80) {
-    scanBuffer += e.key;
-  } else {
-    scanBuffer = e.key;
-  }
-  lastKeyTime = now;
 }
 
 function onScannerInput() {
   clearTimeout(scannerTimer);
   const val = document.getElementById('scanner-input').value.trim();
-  // Se chegou código com 13 dígitos (ISBN-13) processa automaticamente
   if (val.length >= 13) {
     scannerTimer = setTimeout(() => processarISBN(val), 120);
   }
 }
 
 function processarISBN(isbn) {
-  // Limpar espaços e caracteres indesejados
   isbn = isbn.replace(/\D/g, '');
+  document.getElementById('scanner-input').value = '';
   const livro = ISBN_INDEX[isbn];
-  const preview = document.getElementById('scanner-preview');
-  const form = document.getElementById('scanner-form');
+  const fb = document.getElementById('scanner-feedback');
 
   if (!livro) {
-    preview.className = 'preview-box';
-    preview.style.borderColor = 'var(--red)';
-    preview.style.background = 'var(--red-light)';
-    preview.innerHTML = `<div style="color:var(--red);font-weight:600">❌ ISBN não encontrado: ${isbn}</div><div style="font-size:.78rem;color:var(--muted);margin-top:4px">Verifique se o livro está cadastrado no sistema</div>`;
-    form.style.display = 'none';
-    scannerLivro = null;
+    fb.style.background = 'var(--red-light)'; fb.style.color = 'var(--red)';
+    fb.innerHTML = `❌ ISBN não encontrado: <b>${isbn}</b>`;
+    document.getElementById('scanner-qtd-wrap').style.display = 'none';
     return;
   }
 
-  const e = estoque[livro.sku] || 0;
-  if (e === 0) {
-    preview.className = 'preview-box';
-    preview.style.borderColor = 'var(--red)';
-    preview.style.background = 'var(--red-light)';
-    preview.innerHTML = `<div style="color:var(--red);font-weight:600">⚠ Estoque zerado!</div><div style="font-weight:600;margin-top:4px">${livro.nome}</div><div style="font-size:.78rem;color:var(--muted)">Não há unidades disponíveis para venda</div>`;
-    form.style.display = 'none';
-    scannerLivro = null;
+  const estAtual = estoque[livro.sku] || 0;
+  // Verificar estoque considerando o que já está no carrinho
+  const noCarrinho = carrinhoQtd(livro.sku);
+  const disponivel = estAtual - noCarrinho;
+
+  if (disponivel <= 0) {
+    fb.style.background = 'var(--red-light)'; fb.style.color = 'var(--red)';
+    fb.innerHTML = `⚠ <b>${livro.nome}</b><br><span style="font-size:.8rem">Estoque esgotado ou já no carrinho</span>`;
+    document.getElementById('scanner-qtd-wrap').style.display = 'none';
     return;
   }
 
-  // Livro encontrado com estoque!
-  scannerLivro = livro;
-  const cls = e <= 3 ? 'estoque-baixo' : 'estoque-ok';
-  preview.className = 'preview-box filled';
-  preview.style.borderColor = 'var(--green)';
-  preview.style.background = 'var(--green-light)';
-  preview.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-      <span style="font-size:1.2rem">✅</span>
-      <span class="preview-nome" style="font-size:1rem">${livro.nome}</span>
-    </div>
-    <div class="preview-info">ISBN: ${isbn} · SKU: ${livro.sku}</div>
-    <div style="display:flex;gap:16px;margin-top:8px">
-      <div><span style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Preço CDL</span><br><span style="font-weight:700;color:var(--green);font-size:1.1rem">R$ ${livro.precoCDL.toFixed(2).replace('.',',')}</span></div>
-      <div><span style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Estoque</span><br><span class="${cls}" style="font-weight:700;font-size:1.1rem">${e} un.</span></div>
-    </div>`;
+  // ✅ Livro encontrado — adiciona ao carrinho
+  adicionarAoCarrinho(livro, 1);
+  ultimoLido = livro;
 
-  document.getElementById('scanner-qtd').max = e;
-  document.getElementById('scanner-qtd').value = 1;
-  document.getElementById('scanner-data').value = new Date().toISOString().split('T')[0];
-  form.style.display = 'block';
+  fb.style.background = 'var(--green-light)'; fb.style.color = 'var(--green)';
+  fb.innerHTML = `✅ <b>${livro.nome}</b> — R$ ${livro.precoCDL.toFixed(2).replace('.',',')}`;
 
-  // Foco na quantidade para agilizar
-  setTimeout(() => document.getElementById('scanner-qtd').focus(), 50);
+  // Mostrar controle de quantidade do último item
+  const wrap = document.getElementById('scanner-qtd-wrap');
+  const qtdInput = document.getElementById('scanner-qtd');
+  qtdInput.value = 1;
+  qtdInput.max = disponivel;
+  wrap.style.display = 'block';
+
+  renderCarrinho();
+  focarScannerApos();
 }
 
-async function confirmarVendaScanner() {
-  if (!scannerLivro) return;
-  const qtd = parseInt(document.getElementById('scanner-qtd').value) || 1;
-  const data = document.getElementById('scanner-data').value;
-  const colegio = document.getElementById('scanner-colegio').value.trim();
-  const e = estoque[scannerLivro.sku] || 0;
+function focarScannerApos() {
+  // Manter foco no scanner para próxima leitura
+  setTimeout(() => document.getElementById('scanner-input').focus(), 80);
+}
 
-  if (!colegio) { showToast('Informe o colégio/turma!', 'error'); document.getElementById('scanner-colegio').focus(); return; }
-  if (qtd > e) { showToast(`Estoque insuficiente! Disponível: ${e} un.`, 'error'); return; }
+function atualizarQtdUltimo() {
+  if (!ultimoLido) return;
+  const qtd = Math.max(1, parseInt(document.getElementById('scanner-qtd').value) || 1);
+  const itens = passeio.alunos[passeio.alunoAtual].itens;
+  const item = itens.find(i => i.livro.sku === ultimoLido.sku);
+  if (item) { item.qtd = qtd; renderCarrinho(); }
+}
 
-  const btn = document.getElementById('scanner-btn-confirmar');
+function carrinhoQtd(sku) {
+  return passeio.alunos[passeio.alunoAtual].itens
+    .filter(i => i.livro.sku === sku)
+    .reduce((s, i) => s + i.qtd, 0);
+}
+
+function adicionarAoCarrinho(livro, qtd) {
+  const itens = passeio.alunos[passeio.alunoAtual].itens;
+  const existente = itens.find(i => i.livro.sku === livro.sku);
+  if (existente) existente.qtd += qtd;
+  else itens.push({ livro, qtd });
+}
+
+function removerDoCarrinho(sku) {
+  const itens = passeio.alunos[passeio.alunoAtual].itens;
+  passeio.alunos[passeio.alunoAtual].itens = itens.filter(i => i.livro.sku !== sku);
+  if (ultimoLido && ultimoLido.sku === sku) { ultimoLido = null; document.getElementById('scanner-qtd-wrap').style.display = 'none'; }
+  renderCarrinho();
+  focarScanner();
+}
+
+function renderCarrinho() {
+  const itens = passeio.alunos[passeio.alunoAtual].itens;
+  const list = document.getElementById('scan-cart-list');
+  const totalEl = document.getElementById('scan-cart-total');
+  const btnSalvar = document.getElementById('scan-btn-salvar');
+
+  if (!itens.length) {
+    list.innerHTML = `<div class="empty-state" style="padding:20px"><div class="emoji">📚</div><p>Nenhum livro ainda — leia o código de barras</p></div>`;
+    totalEl.style.display = 'none';
+    btnSalvar.style.display = 'none';
+    return;
+  }
+
+  list.innerHTML = itens.map(item => `
+    <div style="background:var(--cream);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.83rem;color:var(--navy);line-height:1.3">${item.livro.nome}</div>
+        <div style="font-size:.73rem;color:var(--green);font-weight:600;margin-top:2px">
+          R$ ${item.livro.precoCDL.toFixed(2).replace('.',',')} × ${item.qtd} = R$ ${(item.livro.precoCDL * item.qtd).toFixed(2).replace('.',',')}
+        </div>
+      </div>
+      <button onclick="removerDoCarrinho(${item.livro.sku})"
+        style="background:none;border:1.5px solid var(--red);color:var(--red);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:.75rem;flex-shrink:0"
+        title="Remover">✕</button>
+    </div>`).join('');
+
+  const totalQtd = itens.reduce((s, i) => s + i.qtd, 0);
+  const totalVal = itens.reduce((s, i) => s + i.livro.precoCDL * i.qtd, 0);
+  document.getElementById('scan-cart-total-val').textContent = `R$ ${totalVal.toFixed(2).replace('.', ',')}`;
+  document.getElementById('scan-cart-total-qtd').textContent = `${totalQtd} livro(s)`;
+  totalEl.style.display = 'block';
+  btnSalvar.style.display = 'block';
+}
+
+async function salvarPedidoAluno() {
+  const itens = passeio.alunos[passeio.alunoAtual].itens;
+  if (!itens.length) { showToast('Adicione pelo menos um livro!', 'error'); return; }
+
+  const btn = document.getElementById('scan-btn-salvar');
   btn.disabled = true; btn.textContent = '⏳ Salvando...';
 
   try {
-    const novoQtd = e - qtd;
-    await upsertEstoque(scannerLivro.sku, novoQtd);
-    await inserirHistorico({ tipo: 'saida', sku: scannerLivro.sku, nome: scannerLivro.nome, qtd, data, obs: '', colegio });
+    // Salvar cada item no banco
+    for (const item of itens) {
+      const estAtual = estoque[item.livro.sku] || 0;
+      const novoQtd = estAtual - item.qtd;
+      await upsertEstoque(item.livro.sku, novoQtd);
+      await inserirHistorico({
+        tipo: 'saida', sku: item.livro.sku, nome: item.livro.nome,
+        qtd: item.qtd, data: passeio.data, obs: `Aluno ${passeio.alunoAtual + 1}`,
+        colegio: passeio.colegio
+      });
+    }
 
-    // Adicionar à sessão
-    sessionVendas.unshift({ livro: scannerLivro, qtd, colegio, data });
-    atualizarColégiosSugeridos(colegio);
-    renderSessionVendas();
-    updateStats(); renderEstoque(); renderAlertas();
+    updateStats(); renderEstoque();
 
-    showToast(`✓ ${qtd}× "${scannerLivro.nome}" vendido(s)!`, 'success');
-    limparScanner();
+    // Próximo aluno
+    passeio.alunoAtual++;
+    passeio.alunos.push({ itens: [] });
+    showToast(`Pedido do Aluno ${passeio.alunoAtual} salvo! ✓`, 'success');
+    mostrarPassoAluno();
+
   } catch(err) {
     showToast('Erro ao salvar. Tente novamente.', 'error');
   }
-  btn.disabled = false; btn.textContent = '✔ Confirmar Venda';
+  btn.disabled = false; btn.textContent = '💾 Salvar Pedido e Próximo Aluno';
 }
 
-function limparScanner() {
-  scannerLivro = null;
-  document.getElementById('scanner-input').value = '';
-  document.getElementById('scanner-form').style.display = 'none';
-  const preview = document.getElementById('scanner-preview');
-  preview.className = 'preview-box';
-  preview.style.borderColor = '';
-  preview.style.background = '';
-  preview.innerHTML = '<span>Aguardando leitura do código de barras...</span>';
-  // Devolver foco ao campo de leitura
-  setTimeout(() => document.getElementById('scanner-input').focus(), 50);
-}
-
-function renderSessionVendas() {
-  const el = document.getElementById('scanner-session-list');
-  const totalEl = document.getElementById('scanner-session-total');
-
-  if (!sessionVendas.length) {
-    el.innerHTML = `<div class="empty-state" style="padding:24px"><div class="emoji">🛒</div><p>Nenhuma venda ainda</p></div>`;
-    totalEl.style.display = 'none';
+function encerrarPasseio() {
+  // Remove o último aluno vazio (o que estava sendo preenchido)
+  const alunos = passeio.alunos.filter(a => a.itens.length > 0);
+  if (!alunos.length) {
+    // Nenhum pedido salvo ainda
+    if (confirm('Nenhum pedido foi salvo. Deseja cancelar o passeio?')) voltarParaColegios();
     return;
   }
+  passeio.alunos = alunos;
+  mostrarResumo();
+}
 
-  el.innerHTML = sessionVendas.map((v, i) => `
-    <div style="background:var(--cream);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:.83rem;color:var(--navy)">${v.livro.nome}</div>
-        <div style="font-size:.73rem;color:var(--muted)">🏫 ${v.colegio}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-weight:700;color:var(--red);font-size:.9rem">−${v.qtd}</div>
-        <div style="font-size:.73rem;color:var(--green);font-weight:600">R$ ${(v.livro.precoCDL * v.qtd).toFixed(2).replace('.',',')}</div>
-      </div>
-    </div>`).join('');
+function mostrarResumo() {
+  document.getElementById('scan-step-aluno').style.display = 'none';
+  document.getElementById('scan-step-resumo').style.display = 'block';
 
-  const totalQtd = sessionVendas.reduce((s, v) => s + v.qtd, 0);
-  const totalVal = sessionVendas.reduce((s, v) => s + v.livro.precoCDL * v.qtd, 0);
-  document.getElementById('scanner-total-valor').textContent = `R$ ${totalVal.toFixed(2).replace('.', ',')}`;
-  document.getElementById('scanner-total-livros').textContent = `${totalQtd} livro(s) vendido(s)`;
-  totalEl.style.display = 'block';
+  const alunos = passeio.alunos.filter(a => a.itens.length > 0);
+  document.getElementById('resumo-sub').textContent =
+    `${passeio.colegio} · ${alunos.length} aluno(s) · ${new Date(passeio.data + 'T12:00:00').toLocaleDateString('pt-BR')}`;
+
+  let totalGeral = 0, qtdGeral = 0;
+  document.getElementById('resumo-list').innerHTML = alunos.map((aluno, idx) => {
+    const totalAluno = aluno.itens.reduce((s, i) => s + i.livro.precoCDL * i.qtd, 0);
+    const qtdAluno = aluno.itens.reduce((s, i) => s + i.qtd, 0);
+    totalGeral += totalAluno; qtdGeral += qtdAluno;
+    return `<div style="background:#fff;border-radius:12px;padding:16px 20px;box-shadow:var(--shadow)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-family:'Fraunces',serif;font-size:1rem;font-weight:700;color:var(--navy)">Aluno ${idx + 1}</div>
+        <div style="font-family:'Fraunces',serif;font-size:1.1rem;font-weight:700;color:var(--green)">R$ ${totalAluno.toFixed(2).replace('.',',')}</div>
+      </div>
+      ${aluno.itens.map(i => `
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:4px 0;border-bottom:1px solid var(--cream2)">
+          <span style="color:var(--text)">${i.livro.nome} × ${i.qtd}</span>
+          <span style="color:var(--green);font-weight:600">R$ ${(i.livro.precoCDL * i.qtd).toFixed(2).replace('.',',')}</span>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+
+  document.getElementById('resumo-total-val').textContent = `R$ ${totalGeral.toFixed(2).replace('.', ',')}`;
+  document.getElementById('resumo-total-info').textContent = `${alunos.length} aluno(s) · ${qtdGeral} livro(s)`;
+}
+
+function voltarParaAlunos() {
+  // Adiciona novo aluno vazio e volta
+  passeio.alunos.push({ itens: [] });
+  passeio.alunoAtual = passeio.alunos.length - 1;
+  mostrarPassoAluno();
+}
+
+function finalizarPasseio() {
+  passeio = null;
+  voltarParaColegios();
+  showToast('Passeio finalizado com sucesso! ✓', 'success');
+  renderAlertas();
+}
+
+function voltarParaColegios() {
+  document.getElementById('scan-step-aluno').style.display = 'none';
+  document.getElementById('scan-step-resumo').style.display = 'none';
+  document.getElementById('scan-step-colegio').style.display = 'block';
+  document.getElementById('scan-colegio-input').value = '';
+  document.getElementById('scan-data-input').value = new Date().toISOString().split('T')[0];
 }
 
 // Sugestões de colégios já usados
@@ -1144,8 +1518,359 @@ function atualizarColégiosSugeridos(colegio) {
     colegiosUsados = colegiosUsados.slice(0, 20);
     localStorage.setItem('cdl_colegios', JSON.stringify(colegiosUsados));
   }
-  const dl = document.getElementById('colegios-list');
-  if (dl) dl.innerHTML = colegiosUsados.map(c => `<option value="${c}">`).join('');
+  document.querySelectorAll('#colegios-list').forEach(dl => {
+    dl.innerHTML = colegiosUsados.map(c => `<option value="${c}">`).join('');
+  });
+}
+
+
+
+
+// ═══════════════════════════════════════════════════
+//  CATÁLOGO DINÂMICO (gerenciado em runtime)
+// ═══════════════════════════════════════════════════
+// LIVROS é o array base; produtos adicionais ficam em LIVROS_EXTRA
+let LIVROS_EXTRA = JSON.parse(localStorage.getItem('cdl_livros_extra') || '[]');
+
+function todosProdutos() {
+  return [...LIVROS, ...LIVROS_EXTRA];
+}
+
+function salvarExtra() {
+  localStorage.setItem('cdl_livros_extra', JSON.stringify(LIVROS_EXTRA));
+  // Rebuild ISBN_INDEX
+  todosProdutos().forEach(l => { if(l.isbn) ISBN_INDEX[l.isbn] = l; });
+}
+
+// ═══════════════════════════════════════════════════
+//  CADASTRO DE PRODUTO
+// ═══════════════════════════════════════════════════
+function cadastrarProduto() {
+  const sku = parseInt(document.getElementById('prod-sku').value);
+  const nome = document.getElementById('prod-nome').value.trim();
+  const isbn = document.getElementById('prod-isbn').value.replace(/\D/g,'') || null;
+  const tipo = document.getElementById('prod-tipo').value;
+  const precoCapa = parseFloat(document.getElementById('prod-preco-capa').value) || 0;
+  const precoCDL = parseFloat(document.getElementById('prod-preco-cdl').value) || 0;
+  const qtd = parseInt(document.getElementById('prod-qtd').value) || 0;
+
+  if (!sku || !nome || !precoCDL) { showToast('Preencha SKU, Nome e Preço CDL!', 'error'); return; }
+
+  const todos = todosProdutos();
+  if (todos.find(l => l.sku === sku)) { showToast('SKU já cadastrado!', 'error'); return; }
+  if (isbn && todos.find(l => l.isbn === isbn)) { showToast('ISBN já cadastrado!', 'error'); return; }
+
+  const novo = { sku, nome, isbn, tipo, precoCapa, precoCDL };
+  LIVROS_EXTRA.push(novo);
+  salvarExtra();
+
+  // Estoque inicial
+  if (qtd > 0) {
+    estoque[sku] = qtd;
+    upsertEstoque(sku, qtd).catch(() => {});
+  } else {
+    estoque[sku] = 0;
+  }
+
+  // Limpar form
+  ['prod-sku','prod-nome','prod-isbn','prod-preco-capa','prod-preco-cdl'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('prod-qtd').value = 0;
+  document.getElementById('prod-tipo').value = 'Livro';
+
+  populateSelects();
+  renderEstoque();
+  updateStats();
+  populateRelProduto();
+  showToast(`"${nome}" cadastrado com sucesso! ✓`, 'success');
+}
+
+// ═══════════════════════════════════════════════════
+//  IMPORTAÇÃO EM MASSA (XLSX)
+// ═══════════════════════════════════════════════════
+let dadosImportacao = [];
+
+function baixarModeloXLSX() {
+  // Gera CSV simples que abre no Excel
+  const header = 'SKU,Nome,ISBN,Tipo,Preço de Capa,Preço CDL,Quantidade';
+  const exemplo = '36900,Exemplo de Livro,9786585310000,Livro,39.90,15.00,5';
+  const csv = header + '\n' + exemplo;
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'modelo-importacao-cdl.csv';
+  a.click();
+  showToast('Modelo baixado! Abra no Excel, preencha e salve como .xlsx', 'success');
+}
+
+async function previewImportacao(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  // Usar SheetJS via CDN para ler xlsx
+  if (!window.XLSX) {
+    await loadSheetJS();
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      dadosImportacao = rows.map(r => ({
+        sku: parseInt(r['SKU'] || r['sku'] || 0),
+        nome: String(r['Nome'] || r['nome'] || '').trim(),
+        isbn: String(r['ISBN'] || r['isbn'] || '').replace(/\D/g,'') || null,
+        tipo: String(r['Tipo'] || r['tipo'] || 'Livro').trim(),
+        precoCapa: parseFloat(r['Preço de Capa'] || r['Preco de Capa'] || r['precoCapa'] || 0),
+        precoCDL: parseFloat(r['Preço CDL'] || r['Preco CDL'] || r['precoCDL'] || 0),
+        qtd: parseInt(r['Quantidade'] || r['quantidade'] || r['Qtd'] || 0)
+      })).filter(r => r.sku && r.nome);
+
+      const el = document.getElementById('import-preview');
+      const info = document.getElementById('import-preview-info');
+      const list = document.getElementById('import-preview-list');
+      el.style.display = 'block';
+      info.textContent = `${dadosImportacao.length} produto(s) encontrado(s) para importar:`;
+      list.innerHTML = dadosImportacao.map(r =>
+        `<div style="background:var(--cream);padding:6px 10px;border-radius:6px;display:flex;gap:8px;align-items:center">
+          <span style="font-family:monospace;color:var(--muted);font-size:.7rem">${r.sku}</span>
+          <span style="flex:1;color:var(--navy);font-weight:500">${r.nome}</span>
+          <span style="color:var(--green);font-weight:600;font-size:.78rem">R$ ${r.precoCDL.toFixed(2).replace('.',',')}</span>
+          <span style="color:var(--muted);font-size:.7rem">${r.tipo}</span>
+        </div>`
+      ).join('');
+    } catch(err) {
+      showToast('Erro ao ler o arquivo. Verifique o formato.', 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function loadSheetJS() {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+async function confirmarImportacao() {
+  if (!dadosImportacao.length) return;
+  const btn = document.getElementById('btn-confirmar-import');
+  btn.disabled = true; btn.textContent = '⏳ Importando...';
+
+  const todos = todosProdutos();
+  let importados = 0, ignorados = 0;
+
+  for (const r of dadosImportacao) {
+    if (todos.find(l => l.sku === r.sku)) { ignorados++; continue; }
+    const { qtd, ...prod } = r;
+    if (!prod.isbn) prod.isbn = null;
+    LIVROS_EXTRA.push(prod);
+    estoque[r.sku] = r.qtd || 0;
+    if (r.qtd > 0) await upsertEstoque(r.sku, r.qtd).catch(()=>{});
+    importados++;
+  }
+
+  salvarExtra();
+  populateSelects();
+  renderEstoque();
+  updateStats();
+  populateRelProduto();
+
+  btn.disabled = false; btn.textContent = '✔ Importar Produtos';
+  document.getElementById('import-preview').style.display = 'none';
+  document.getElementById('prod-file').value = '';
+  dadosImportacao = [];
+  showToast(`${importados} produto(s) importado(s)${ignorados ? `, ${ignorados} ignorado(s) (SKU duplicado)` : ''}! ✓`, 'success');
+}
+
+// ═══════════════════════════════════════════════════
+//  RELATÓRIO
+// ═══════════════════════════════════════════════════
+let dadosRelatorio = [];
+
+function populateRelProduto() {
+  const sel = document.getElementById('rel-produto');
+  if (!sel) return;
+  const todos = todosProdutos();
+  sel.innerHTML = '<option value="">Todos os produtos</option>' +
+    todos.map(l => `<option value="${l.sku}">${l.nome}</option>`).join('');
+}
+
+async function gerarRelatorio() {
+  // Buscar histórico atualizado
+  await carregarHistorico();
+
+  const dataIni = document.getElementById('rel-data-ini').value;
+  const dataFim = document.getElementById('rel-data-fim').value;
+  const colegio = document.getElementById('rel-colegio').value.trim().toLowerCase();
+  const skuFiltro = document.getElementById('rel-produto').value;
+
+  dadosRelatorio = historico.filter(h => {
+    if (h.tipo !== 'saida') return false;
+    if (dataIni && h.data < dataIni) return false;
+    if (dataFim && h.data > dataFim) return false;
+    if (colegio && !(h.colegio||'').toLowerCase().includes(colegio)) return false;
+    if (skuFiltro && String(h.sku) !== skuFiltro) return false;
+    return true;
+  });
+
+  if (!dadosRelatorio.length) {
+    showToast('Nenhuma venda encontrada com esses filtros.', 'error');
+    document.getElementById('rel-tabela-wrap').style.display = 'none';
+    document.getElementById('btn-exportar-rel').style.display = 'none';
+    document.getElementById('rel-resumo').innerHTML = `<div class="empty-state" style="padding:24px"><div class="emoji">📭</div><p>Nenhuma venda encontrada</p></div>`;
+    return;
+  }
+
+  const todos = todosProdutos();
+  const getTipo = sku => todos.find(l => l.sku === sku)?.tipo || 'Livro';
+  const getPrecoCDL = (sku, nome) => {
+    const p = todos.find(l => l.sku === sku);
+    return p ? p.precoCDL : null;
+  };
+
+  // Enriquecer dados
+  dadosRelatorio = dadosRelatorio.map(h => ({
+    ...h,
+    tipo_produto: getTipo(h.sku),
+    precoCDL: getPrecoCDL(h.sku) || 0,
+    total: (getPrecoCDL(h.sku) || 0) * h.qtd
+  }));
+
+  // ── Resumo
+  const totalGeral = dadosRelatorio.reduce((s, h) => s + h.total, 0);
+  const totalQtd = dadosRelatorio.reduce((s, h) => s + h.qtd, 0);
+
+  // Por colégio
+  const porColegio = {};
+  dadosRelatorio.forEach(h => {
+    const c = h.colegio || '(sem colégio)';
+    porColegio[c] = (porColegio[c] || 0) + h.total;
+  });
+
+  // Por produto
+  const porProduto = {};
+  dadosRelatorio.forEach(h => {
+    porProduto[h.nome] = (porProduto[h.nome] || { qtd: 0, total: 0 });
+    porProduto[h.nome].qtd += h.qtd;
+    porProduto[h.nome].total += h.total;
+  });
+
+  const resumoEl = document.getElementById('rel-resumo');
+  resumoEl.innerHTML = `
+    <div style="background:var(--navy);color:#fff;border-radius:10px;padding:14px 18px;text-align:center">
+      <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--gold);margin-bottom:4px">Total Faturado</div>
+      <div style="font-family:'Fraunces',serif;font-size:1.8rem;font-weight:700;color:var(--gold)">R$ ${totalGeral.toFixed(2).replace('.',',')}</div>
+      <div style="font-size:.78rem;color:rgba(255,255,255,.6)">${totalQtd} unidade(s) vendida(s)</div>
+    </div>
+    <div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px">Por Colégio</div>
+      ${Object.entries(porColegio).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--cream2);font-size:.83rem">
+          <span>🏫 ${c}</span><span style="font-weight:600;color:var(--green)">R$ ${v.toFixed(2).replace('.',',')}</span>
+        </div>`).join('')}
+    </div>
+    <div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px">Top Produtos</div>
+      ${Object.entries(porProduto).sort((a,b)=>b[1].total-a[1].total).slice(0,5).map(([n,v])=>`
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--cream2);font-size:.82rem">
+          <span style="flex:1;margin-right:8px">${n}</span>
+          <span style="color:var(--muted);font-size:.75rem">${v.qtd}un</span>
+          <span style="font-weight:600;color:var(--green);margin-left:8px">R$ ${v.total.toFixed(2).replace('.',',')}</span>
+        </div>`).join('')}
+    </div>`;
+
+  // ── Tabela detalhada
+  const tbody = document.getElementById('rel-tbody');
+  tbody.innerHTML = dadosRelatorio.map(h => {
+    const dataFmt = h.data ? new Date(h.data+'T12:00:00').toLocaleDateString('pt-BR') : '—';
+    return `<tr>
+      <td>${dataFmt}</td>
+      <td>${h.colegio||'—'}</td>
+      <td style="color:var(--muted);font-size:.78rem">${h.obs||'—'}</td>
+      <td class="td-nome">${h.nome}</td>
+      <td><span class="badge badge-ok" style="font-size:.65rem">${h.tipo_produto}</span></td>
+      <td style="text-align:center;font-weight:600">${h.qtd}</td>
+      <td class="td-preco">R$ ${h.precoCDL.toFixed(2).replace('.',',')}</td>
+      <td style="font-weight:700;color:var(--navy)">R$ ${h.total.toFixed(2).replace('.',',')}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('rel-tabela-wrap').style.display = 'block';
+  document.getElementById('btn-exportar-rel').style.display = 'block';
+  showToast(`${dadosRelatorio.length} registro(s) encontrado(s)`, 'success');
+}
+
+async function exportarRelatorioXLSX() {
+  if (!window.XLSX) await loadSheetJS();
+
+  const todos = todosProdutos();
+  const getTipo = sku => todos.find(l => l.sku === sku)?.tipo || 'Livro';
+
+  // 1. Aba: Detalhamento
+  const detalhe = dadosRelatorio.map(h => ({
+    'Data': h.data ? new Date(h.data+'T12:00:00').toLocaleDateString('pt-BR') : '',
+    'Colégio': h.colegio || '',
+    'Aluno': h.obs || '',
+    'SKU': h.sku,
+    'Produto': h.nome,
+    'Tipo': h.tipo_produto,
+    'Qtd': h.qtd,
+    'Preço CDL': h.precoCDL,
+    'Total': h.total
+  }));
+
+  // 2. Aba: Por Colégio
+  const porColegio = {};
+  dadosRelatorio.forEach(h => {
+    const c = h.colegio || '(sem colégio)';
+    if (!porColegio[c]) porColegio[c] = { qtd: 0, total: 0 };
+    porColegio[c].qtd += h.qtd; porColegio[c].total += h.total;
+  });
+  const abaCol = Object.entries(porColegio).map(([c, v]) => ({
+    'Colégio': c, 'Qtd Livros': v.qtd, 'Total (R$)': v.total
+  }));
+
+  // 3. Aba: Por Produto
+  const porProd = {};
+  dadosRelatorio.forEach(h => {
+    if (!porProd[h.nome]) porProd[h.nome] = { tipo: h.tipo_produto, qtd: 0, total: 0 };
+    porProd[h.nome].qtd += h.qtd; porProd[h.nome].total += h.total;
+  });
+  const abaProd = Object.entries(porProd).sort((a,b)=>b[1].total-a[1].total).map(([n,v]) => ({
+    'Produto': n, 'Tipo': v.tipo, 'Qtd Vendida': v.qtd, 'Total (R$)': v.total
+  }));
+
+  // 4. Aba: Por Passeio (colégio + data)
+  const porPasseio = {};
+  dadosRelatorio.forEach(h => {
+    const key = `${h.colegio||'—'} | ${h.data||''}`;
+    if (!porPasseio[key]) porPasseio[key] = { colegio: h.colegio||'—', data: h.data||'', alunos: new Set(), qtd: 0, total: 0 };
+    if (h.obs) porPasseio[key].alunos.add(h.obs);
+    porPasseio[key].qtd += h.qtd; porPasseio[key].total += h.total;
+  });
+  const abaPasseio = Object.values(porPasseio).map(v => ({
+    'Colégio': v.colegio,
+    'Data': v.data ? new Date(v.data+'T12:00:00').toLocaleDateString('pt-BR') : '',
+    'Qtd Alunos': v.alunos.size,
+    'Qtd Livros': v.qtd,
+    'Total (R$)': v.total
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalhe), 'Detalhamento');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(abaCol), 'Por Colégio');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(abaProd), 'Por Produto');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(abaPasseio), 'Por Passeio');
+
+  const hoje = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `relatorio-cdl-${hoje}.xlsx`);
+  showToast('Relatório Excel exportado! ✓', 'success');
 }
 
 // ═══════════════════════════════════════════════════
@@ -1153,11 +1878,29 @@ function atualizarColégiosSugeridos(colegio) {
 // ═══════════════════════════════════════════════════
 const savedUrl=localStorage.getItem('cdl_sb_url');
 const savedKey=localStorage.getItem('cdl_sb_key');
+const savedToken=localStorage.getItem('cdl_token');
+const savedEmail=localStorage.getItem('cdl_user_email');
+
 if(savedUrl&&savedKey){
   SB_URL=savedUrl; SB_KEY=savedKey;
   document.getElementById('cfg-url').value=savedUrl;
   document.getElementById('cfg-key').value=savedKey;
-  iniciar();
+  if(savedToken){
+    // Sessão salva — tentar entrar direto
+    SB_TOKEN=savedToken;
+    if(savedEmail) document.getElementById('header-usuario').textContent=savedEmail.split('@')[0];
+    iniciar().catch(()=>{
+      // Token expirado — pedir login novamente
+      localStorage.removeItem('cdl_token');
+      document.getElementById('login-screen').classList.add('open');
+    });
+  } else {
+    // Configurado mas sem sessão — mostrar login
+    document.getElementById('login-screen').classList.add('open');
+  }
+} else {
+  // Primeira vez — mostrar setup
+  document.getElementById('setup-screen').classList.add('open');
 }
 </script>
 </body>
