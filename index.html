@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estoque CDL</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;0,700;1,300&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0f2340;
+    --navy2: #1a3558;
+    --gold: #c9a84c;
+    --gold2: #e8c96a;
+    --cream: #f7f3ec;
+    --cream2: #ede8df;
+    --red: #c0392b;
+    --red-light: #fdf0ee;
+    --green: #2d6a4f;
+    --green-light: #eaf4ef;
+    --orange: #d4680a;
+    --orange-light: #fef3e8;
+    --text: #1a1a2e;
+    --muted: #7a7a8c;
+    --border: #ddd8cf;
+    --shadow: 0 2px 12px rgba(15,35,64,0.10);
+    --shadow-lg: 0 8px 32px rgba(15,35,64,0.14);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); min-height: 100vh; }
+
+  /* SETUP SCREEN */
+  #setup-screen {
+    display: none;
+    position: fixed; inset: 0;
+    background: var(--navy);
+    z-index: 9000;
+    align-items: center;
+    justify-content: center;
+  }
+  #setup-screen.open { display: flex; }
+  .setup-box {
+    background: #fff;
+    border-radius: 16px;
+    padding: 40px;
+    max-width: 520px;
+    width: 92%;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+  }
+  .setup-logo {
+    font-family: 'Fraunces', serif;
+    font-size: 1.5rem;
+    color: var(--navy);
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .setup-logo span { color: var(--gold); }
+  .setup-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 28px; line-height: 1.5; }
+  .setup-step { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--gold); margin-bottom: 20px; }
+  .setup-field { margin-bottom: 16px; }
+  .setup-field label { display: block; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
+  .setup-field input {
+    width: 100%; padding: 11px 14px;
+    border: 1.5px solid var(--border); border-radius: 8px;
+    font-family: 'DM Sans', sans-serif; font-size: 0.9rem; color: var(--text);
+    transition: border-color .15s;
+  }
+  .setup-field input:focus { outline: none; border-color: var(--navy); }
+  .setup-hint { font-size: 0.76rem; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+  .setup-hint a { color: var(--navy); }
+  .setup-btn {
+    width: 100%; background: var(--navy); color: #fff; border: none;
+    border-radius: 8px; padding: 13px; font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem; font-weight: 600; cursor: pointer; margin-top: 8px;
+    transition: background .15s;
+  }
+  .setup-btn:hover { background: var(--navy2); }
+  .setup-divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  .setup-guide { background: var(--cream); border-radius: 10px; padding: 16px; font-size: 0.8rem; line-height: 1.7; color: var(--text); }
+  .setup-guide b { color: var(--navy); }
+  .setup-guide code { background: #e0e0e0; padding: 1px 5px; border-radius: 4px; font-size: 0.78rem; }
+
+  /* LOADING */
+  #loading-screen {
+    display: none; position: fixed; inset: 0;
+    background: var(--navy); z-index: 8000;
+    align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+  }
+  #loading-screen.open { display: flex; }
+  .spinner {
+    width: 40px; height: 40px; border: 3px solid rgba(201,168,76,.3);
+    border-top-color: var(--gold); border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-txt { color: rgba(255,255,255,.7); font-size: .9rem; }
+
+  /* HEADER */
+  header {
+    background: var(--navy); padding: 0 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px; position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.18);
+  }
+  .logo { font-family: 'Fraunces', serif; color: var(--gold); font-size: 1.25rem; font-weight: 600; letter-spacing: .02em; }
+  .logo span { color: #fff; font-weight: 300; font-style: italic; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .conn-status {
+    font-size: .72rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .06em; padding: 4px 10px; border-radius: 20px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .conn-status.ok { background: var(--green-light); color: var(--green); }
+  .conn-status.err { background: var(--red-light); color: var(--red); }
+  .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab {
+    background: none; border: none; color: rgba(255,255,255,.55);
+    font-family: 'DM Sans', sans-serif; font-size: .82rem; font-weight: 500;
+    padding: 8px 14px; border-radius: 6px; cursor: pointer; transition: all .18s;
+    letter-spacing: .03em; text-transform: uppercase;
+  }
+  .nav-tab:hover { background: rgba(255,255,255,.08); color: #fff; }
+  .nav-tab.active { background: var(--gold); color: var(--navy); font-weight: 600; }
+
+  /* MAIN */
+  main { max-width: 1280px; margin: 0 auto; padding: 32px 24px; }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 32px; }
+  .summary-card {
+    background: #fff; border-radius: 12px; padding: 20px 24px;
+    box-shadow: var(--shadow); border-left: 4px solid var(--gold);
+    transition: transform .15s;
+  }
+  .summary-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .summary-card.alert { border-left-color: var(--red); }
+  .summary-card.green { border-left-color: var(--green); }
+  .summary-card.orange { border-left-color: var(--orange); }
+  .summary-card .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+  .summary-card .value { font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 700; color: var(--navy); line-height: 1; }
+  .summary-card .sub { font-size: .78rem; color: var(--muted); margin-top: 4px; }
+
+  .section { display: none; }
+  .section.active { display: block; }
+  .section-title { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 600; color: var(--navy); margin-bottom: 6px; }
+  .section-sub { font-size: .85rem; color: var(--muted); margin-bottom: 24px; }
+
+  /* TABELA */
+  .table-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .search-wrap { position: relative; flex: 1; min-width: 220px; }
+  .search-wrap input {
+    width: 100%; padding: 9px 12px 9px 36px;
+    border: 1.5px solid var(--border); border-radius: 8px;
+    font-family: 'DM Sans', sans-serif; font-size: .88rem;
+    background: #fff; color: var(--text); transition: border-color .15s;
+  }
+  .search-wrap input:focus { outline: none; border-color: var(--navy); }
+  .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  .filter-select {
+    padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-family: 'DM Sans', sans-serif; font-size: .88rem;
+    background: #fff; color: var(--text); cursor: pointer;
+  }
+  .filter-select:focus { outline: none; border-color: var(--navy); }
+
+  .table-wrap { background: #fff; border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: var(--navy); color: rgba(255,255,255,.85);
+    font-size: .72rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .07em; padding: 12px 16px; text-align: left; white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid var(--cream2); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--cream); }
+  tbody td { padding: 11px 16px; font-size: .85rem; vertical-align: middle; }
+  .td-nome { font-weight: 500; color: var(--navy); max-width: 280px; }
+  .td-sku { color: var(--muted); font-size: .78rem; font-family: monospace; }
+  .td-preco { font-weight: 600; color: var(--green); }
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: .7rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .badge-ok { background: var(--green-light); color: var(--green); }
+  .badge-baixo { background: var(--orange-light); color: var(--orange); }
+  .badge-zero { background: var(--red-light); color: var(--red); }
+  .estoque-ok { color: var(--green); font-weight: 700; }
+  .estoque-baixo { color: var(--orange); font-weight: 700; }
+  .estoque-zero { color: var(--red); font-weight: 700; }
+
+  .btn-action {
+    background: none; border: 1.5px solid var(--border); border-radius: 6px;
+    padding: 5px 10px; font-size: .78rem; font-family: 'DM Sans', sans-serif;
+    cursor: pointer; color: var(--navy); transition: all .15s; margin-right: 4px;
+  }
+  .btn-action:hover { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .btn-action.venda { border-color: var(--red); color: var(--red); }
+  .btn-action.venda:hover { background: var(--red); color: #fff; }
+  .btn-action.entrada { border-color: var(--green); color: var(--green); }
+  .btn-action.entrada:hover { background: var(--green); color: #fff; }
+
+  /* FORMULÁRIOS */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .form-card { background: #fff; border-radius: 12px; padding: 28px; box-shadow: var(--shadow); }
+  .form-card h3 { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 600; margin-bottom: 4px; color: var(--navy); }
+  .form-card .form-desc { font-size: .82rem; color: var(--muted); margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 10px 13px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-family: 'DM Sans', sans-serif; font-size: .9rem; color: var(--text); background: #fff; transition: border-color .15s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--navy); }
+  .form-group textarea { resize: vertical; min-height: 72px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .btn-primary {
+    background: var(--navy); color: #fff; border: none; border-radius: 8px;
+    padding: 11px 24px; font-family: 'DM Sans', sans-serif; font-size: .9rem;
+    font-weight: 600; cursor: pointer; width: 100%; transition: background .15s, transform .1s; margin-top: 4px;
+  }
+  .btn-primary:hover { background: var(--navy2); transform: translateY(-1px); }
+  .btn-primary.danger { background: var(--red); }
+  .btn-primary.danger:hover { background: #a93226; }
+  .btn-primary.success { background: var(--green); }
+  .btn-primary.success:hover { background: #1e4d37; }
+  .preview-box {
+    background: var(--cream); border: 1.5px dashed var(--border); border-radius: 8px;
+    padding: 14px; font-size: .85rem; color: var(--muted);
+    min-height: 72px; display: flex; align-items: center; justify-content: center; text-align: center;
+  }
+  .preview-box.filled { border-color: var(--navy); background: #fff; color: var(--text); flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px; }
+  .preview-nome { font-weight: 600; color: var(--navy); }
+  .preview-info { font-size: .78rem; color: var(--muted); }
+
+  /* HISTÓRICO */
+  .hist-list { display: flex; flex-direction: column; gap: 10px; }
+  .hist-item { background: #fff; border-radius: 10px; padding: 14px 18px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 14px; }
+  .hist-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+  .hist-icon.entrada { background: var(--green-light); }
+  .hist-icon.saida { background: var(--red-light); }
+  .hist-body { flex: 1; }
+  .hist-nome { font-weight: 600; font-size: .88rem; color: var(--navy); }
+  .hist-detalhe { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+  .hist-qtd { font-family: 'Fraunces', serif; font-size: 1.2rem; font-weight: 700; }
+  .hist-qtd.entrada { color: var(--green); }
+  .hist-qtd.saida { color: var(--red); }
+  .hist-time { font-size: .72rem; color: var(--muted); text-align: right; white-space: nowrap; }
+
+  /* ALERTAS */
+  .alert-item { background: #fff; border-radius: 10px; padding: 14px 18px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 14px; border-left: 4px solid var(--orange); margin-bottom: 10px; }
+  .alert-item.zero { border-left-color: var(--red); }
+  .alert-nome { font-weight: 600; font-size: .88rem; color: var(--navy); }
+  .alert-info { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+  .alert-estoque { font-family: 'Fraunces', serif; font-size: 1.4rem; font-weight: 700; min-width: 40px; text-align: center; }
+  .alert-estoque.zero { color: var(--red); }
+  .alert-estoque.baixo { color: var(--orange); }
+
+  /* ESTOQUE INICIAL */
+  .init-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+  .init-item {
+    background: #fff; border-radius: 10px; padding: 14px 16px;
+    box-shadow: var(--shadow); display: flex; align-items: center; gap: 12px;
+  }
+  .init-nome { flex: 1; font-size: .83rem; font-weight: 500; color: var(--navy); line-height: 1.3; }
+  .init-sku { font-size: .7rem; color: var(--muted); font-family: monospace; }
+  .init-preco { font-size: .75rem; color: var(--green); font-weight: 600; }
+  .init-input {
+    width: 62px; padding: 7px 8px; border: 1.5px solid var(--border); border-radius: 7px;
+    font-family: 'DM Sans', sans-serif; font-size: .9rem; font-weight: 600;
+    text-align: center; color: var(--navy); flex-shrink: 0;
+  }
+  .init-input:focus { outline: none; border-color: var(--navy); }
+  .init-toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .btn-outline {
+    background: #fff; border: 1.5px solid var(--navy); color: var(--navy);
+    border-radius: 8px; padding: 9px 18px; font-family: 'DM Sans', sans-serif;
+    font-size: .85rem; font-weight: 600; cursor: pointer; transition: all .15s;
+  }
+  .btn-outline:hover { background: var(--navy); color: #fff; }
+  .btn-outline.danger { border-color: var(--red); color: var(--red); }
+  .btn-outline.danger:hover { background: var(--red); color: #fff; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(10,20,40,.55); z-index: 500; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 14px; padding: 32px; max-width: 440px; width: 90%; box-shadow: var(--shadow-lg); animation: modalIn .2s ease; }
+  @keyframes modalIn { from { opacity:0; transform:scale(.95) translateY(10px); } }
+  .modal h3 { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--navy); margin-bottom: 6px; }
+  .modal p { font-size: .85rem; color: var(--muted); margin-bottom: 20px; }
+  .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-btns button { flex: 1; }
+  .btn-secondary { background: #fff; color: var(--navy); border: 1.5px solid var(--border); border-radius: 8px; padding: 11px 20px; font-family: 'DM Sans', sans-serif; font-size: .9rem; font-weight: 500; cursor: pointer; }
+  .btn-secondary:hover { background: var(--cream); }
+
+  #toast { position: fixed; bottom: 28px; right: 28px; background: var(--navy); color: #fff; padding: 13px 22px; border-radius: 10px; font-size: .88rem; font-weight: 500; box-shadow: var(--shadow-lg); z-index: 9999; opacity: 0; transform: translateY(10px); transition: all .25s; pointer-events: none; border-left: 4px solid var(--gold); max-width: 340px; }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.success { border-left-color: #4ade80; }
+  #toast.error { border-left-color: var(--red); background: #3d1515; }
+
+  .empty-state { text-align: center; padding: 48px 24px; color: var(--muted); }
+  .empty-state .emoji { font-size: 2.5rem; margin-bottom: 12px; }
+
+  .section-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 20px 0 10px; }
+
+  @media(max-width:900px) {
+    .summary-grid { grid-template-columns: repeat(2,1fr); }
+    .form-grid { grid-template-columns: 1fr; }
+    .init-grid { grid-template-columns: repeat(2,1fr); }
+    header { padding: 0 14px; }
+    .nav-tab { padding: 7px 9px; font-size: .7rem; }
+  }
+  @media(max-width:600px) {
+    .summary-grid { grid-template-columns: 1fr 1fr; }
+    .init-grid { grid-template-columns: 1fr 1fr; }
+    .header-right { gap: 6px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen" class="open">
+  <div class="setup-box">
+    <div class="setup-logo">Estoque <span>CDL</span></div>
+    <p class="setup-sub">Para sincronizar o estoque entre todos os funcionários, precisamos conectar ao Supabase — banco de dados gratuito na nuvem.</p>
+
+    <div class="setup-step">Configuração inicial — faça isso uma única vez</div>
+
+    <div class="setup-field">
+      <label>URL do Projeto Supabase</label>
+      <input type="text" id="cfg-url" placeholder="https://xxxxxxxxxxxx.supabase.co">
+      <div class="setup-hint">Encontre em: <b>Project Settings → API → Project URL</b></div>
+    </div>
+    <div class="setup-field">
+      <label>Chave Anon (anon / public)</label>
+      <input type="text" id="cfg-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+      <div class="setup-hint">Encontre em: <b>Project Settings → API → Project API Keys → anon public</b></div>
+    </div>
+
+    <button class="setup-btn" onclick="salvarConfig()">Conectar e Entrar →</button>
+
+    <hr class="setup-divider">
+
+    <div class="setup-guide">
+      <b>Como criar sua conta gratuita no Supabase:</b><br>
+      1. Acesse <a href="https://supabase.com" target="_blank">supabase.com</a> e clique em <b>Start your project</b><br>
+      2. Crie uma conta com Google ou GitHub<br>
+      3. Clique em <b>New Project</b>, dê um nome (ex: <code>estoque-cdl</code>) e crie uma senha<br>
+      4. Aguarde ~2 minutos enquanto o projeto é criado<br>
+      5. Vá em <b>SQL Editor</b> e cole e execute o SQL abaixo:<br><br>
+      <code style="display:block;white-space:pre;background:#e8e8e8;padding:10px;border-radius:6px;font-size:.72rem;line-height:1.6">CREATE TABLE estoque (
+  sku BIGINT PRIMARY KEY,
+  quantidade INTEGER DEFAULT 0
+);
+CREATE TABLE historico (
+  id BIGSERIAL PRIMARY KEY,
+  tipo TEXT,
+  sku BIGINT,
+  nome TEXT,
+  qtd INTEGER,
+  data DATE,
+  obs TEXT,
+  colegio TEXT,
+  criado_em TIMESTAMPTZ DEFAULT NOW()
+);</code><br>
+      6. Cole a URL e a chave acima e clique em <b>Conectar</b>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-txt">Conectando ao banco de dados...</div>
+</div>
+
+<header>
+  <div class="logo">Estoque <span>CDL</span></div>
+  <div class="header-right">
+    <div class="conn-status ok" id="conn-status">
+      <div class="conn-dot"></div>
+      <span>Online</span>
+    </div>
+    <nav class="nav-tabs">
+      <button class="nav-tab active"  onclick="showSection('estoque',this)">📦 Estoque</button>
+      <button class="nav-tab" onclick="showSection('movimentos',this)">↕ Movimentos</button>
+      <button class="nav-tab" onclick="showSection('historico',this)">📋 Histórico</button>
+      <button class="nav-tab" onclick="showSection('alertas',this)">🔔 Alertas</button>
+      <button class="nav-tab" onclick="showSection('inicial',this)">⚙ Estoque Inicial</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="summary-grid">
+    <div class="summary-card"><div class="label">Total de Títulos</div><div class="value" id="stat-titulos">—</div><div class="sub">livros cadastrados</div></div>
+    <div class="summary-card green"><div class="label">Unidades em Estoque</div><div class="value" id="stat-unidades">—</div><div class="sub">total em estoque</div></div>
+    <div class="summary-card orange"><div class="label">Estoque Baixo</div><div class="value" id="stat-baixo">—</div><div class="sub">abaixo de 3 unidades</div></div>
+    <div class="summary-card alert"><div class="label">Sem Estoque</div><div class="value" id="stat-zero">—</div><div class="sub">precisam reposição</div></div>
+  </div>
+
+  <!-- ESTOQUE -->
+  <section class="section active" id="sec-estoque">
+    <div class="section-title">Estoque Atual</div>
+    <div class="section-sub">Visão geral de todos os livros do CDL com quantidades em estoque.</div>
+    <div class="table-toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-estoque" placeholder="Buscar por título ou SKU..." oninput="renderEstoque()">
+      </div>
+      <select class="filter-select" id="filter-estoque" onchange="renderEstoque()">
+        <option value="todos">Todos os livros</option>
+        <option value="ok">Com estoque</option>
+        <option value="baixo">Estoque baixo (≤ 3)</option>
+        <option value="zero">Sem estoque</option>
+      </select>
+      <select class="filter-select" id="filter-preco" onchange="renderEstoque()">
+        <option value="todos">Todos os preços</option>
+        <option value="10">R$ 10,00</option>
+        <option value="15">R$ 15,00</option>
+        <option value="20">R$ 20,00</option>
+        <option value="25">R$ 25,00</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>SKU</th><th>Título</th><th>Preço CDL</th><th>Estoque</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody id="tbody-estoque"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- MOVIMENTOS -->
+  <section class="section" id="sec-movimentos">
+    <div class="section-title">Registrar Movimento</div>
+    <div class="section-sub">Registre entradas (reposição) e saídas (vendas) do estoque.</div>
+    <div class="form-grid">
+      <div class="form-card">
+        <h3>📥 Entrada de Estoque</h3>
+        <p class="form-desc">Registre a chegada de novos livros para o CDL.</p>
+        <div class="form-group"><label>Livro</label><select id="entrada-livro" onchange="updatePreview('entrada')"><option value="">Selecione o livro...</option></select></div>
+        <div id="preview-entrada" class="preview-box">Selecione um livro para ver os detalhes</div><br>
+        <div class="form-row">
+          <div class="form-group"><label>Quantidade</label><input type="number" id="entrada-qtd" min="1" value="1"></div>
+          <div class="form-group"><label>Data</label><input type="date" id="entrada-data"></div>
+        </div>
+        <div class="form-group"><label>Observação (opcional)</label><textarea id="entrada-obs" placeholder="Ex: Reposição evento Colégio X..."></textarea></div>
+        <button class="btn-primary success" onclick="registrarMovimento('entrada')">✔ Registrar Entrada</button>
+      </div>
+      <div class="form-card">
+        <h3>📤 Saída / Venda</h3>
+        <p class="form-desc">Registre livros vendidos no passeio do CDL.</p>
+        <div class="form-group"><label>Livro</label><select id="saida-livro" onchange="updatePreview('saida')"><option value="">Selecione o livro...</option></select></div>
+        <div id="preview-saida" class="preview-box">Selecione um livro para ver os detalhes</div><br>
+        <div class="form-row">
+          <div class="form-group"><label>Quantidade</label><input type="number" id="saida-qtd" min="1" value="1"></div>
+          <div class="form-group"><label>Data</label><input type="date" id="saida-data"></div>
+        </div>
+        <div class="form-group"><label>Colégio / Turma (opcional)</label><input type="text" id="saida-colegio" placeholder="Ex: Colégio São Paulo - 3º ano"></div>
+        <button class="btn-primary danger" onclick="registrarMovimento('saida')">✔ Registrar Venda</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- HISTÓRICO -->
+  <section class="section" id="sec-historico">
+    <div class="section-title">Histórico de Movimentos</div>
+    <div class="section-sub">Registro completo de todas as entradas e saídas.</div>
+    <div class="table-toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-hist" placeholder="Buscar no histórico..." oninput="renderHistorico()">
+      </div>
+      <select class="filter-select" id="filter-hist" onchange="renderHistorico()">
+        <option value="todos">Todos</option>
+        <option value="entrada">Entradas</option>
+        <option value="saida">Saídas/Vendas</option>
+      </select>
+      <button class="btn-action" onclick="exportarCSV()">⬇ Exportar CSV</button>
+    </div>
+    <div class="hist-list" id="hist-list"></div>
+  </section>
+
+  <!-- ALERTAS -->
+  <section class="section" id="sec-alertas">
+    <div class="section-title">Alertas de Estoque</div>
+    <div class="section-sub">Livros que precisam de atenção — estoque zerado ou abaixo do mínimo.</div>
+    <div id="alerts-grid"></div>
+  </section>
+
+  <!-- ESTOQUE INICIAL -->
+  <section class="section" id="sec-inicial">
+    <div class="section-title">⚙ Estoque Inicial</div>
+    <div class="section-sub">Informe a quantidade atual de cada livro para começar a usar o sistema. Faça isso uma única vez — depois use os Movimentos para atualizar.</div>
+    <div class="init-toolbar">
+      <div class="search-wrap" style="max-width:300px">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-init" placeholder="Buscar livro..." oninput="renderInicial()">
+      </div>
+      <button class="btn-outline" onclick="zerarTodos()">Zerar todos</button>
+      <button class="btn-primary success" style="width:auto;padding:9px 24px" onclick="salvarEstoqueInicial()">💾 Salvar Estoque Inicial</button>
+    </div>
+    <div class="init-grid" id="init-grid"></div>
+  </section>
+</main>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modal-title"></h3>
+    <p id="modal-body"></p>
+    <div id="modal-extra"></div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn-primary" id="modal-confirm">Confirmar</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  CATÁLOGO DE LIVROS
+// ═══════════════════════════════════════════════════
+const LIVROS = [{"sku":28702,"nome":"Pinóquio","precoCapa":89.9,"precoCDL":25.0},{"sku":33480,"nome":"Poliana","precoCapa":89.9,"precoCDL":20.0},{"sku":34818,"nome":"Rebeca do vale do sol","precoCapa":94.9,"precoCDL":25.0},{"sku":33399,"nome":"Cinco crianças e um segredo","precoCapa":89.9,"precoCDL":20.0},{"sku":34080,"nome":"A princesa e Curdie","precoCapa":86.9,"precoCDL":20.0},{"sku":30523,"nome":"O Mágico de Oz","precoCapa":74.9,"precoCDL":25.0},{"sku":32219,"nome":"O vento nos salgueiros","precoCapa":79.9,"precoCDL":20.0},{"sku":35047,"nome":"Rei Artur e os cavaleiros da távola redonda","precoCapa":69.9,"precoCDL":20.0},{"sku":35976,"nome":"A história de um quebra-nozes e outros contos de natal","precoCapa":59.9,"precoCDL":20.0},{"sku":35305,"nome":"Caninos brancos","precoCapa":54.9,"precoCDL":20.0},{"sku":31456,"nome":"Moby Dick","precoCapa":69.9,"precoCDL":25.0},{"sku":35731,"nome":"Bambi: uma história de vida na floresta","precoCapa":75.9,"precoCDL":20.0},{"sku":29322,"nome":"Poesias infantis","precoCapa":69.9,"precoCDL":20.0},{"sku":35317,"nome":"A estrela azul","precoCapa":75.9,"precoCDL":20.0},{"sku":34650,"nome":"Otto da mão de prata","precoCapa":61.2,"precoCDL":20.0},{"sku":29100,"nome":"O lago secreto","precoCapa":59.9,"precoCDL":20.0},{"sku":30413,"nome":"Uma cantiga de Natal","precoCapa":44.9,"precoCDL":15.0},{"sku":33775,"nome":"Travando línguas travessas","precoCapa":49.9,"precoCDL":20.0},{"sku":34732,"nome":"O café da manhã da família 14","precoCapa":37.9,"precoCDL":15.0},{"sku":32186,"nome":"Rikki-Tikki-Tavi","precoCapa":42.5,"precoCDL":15.0},{"sku":28749,"nome":"Os Coloridos da Fada Tarsila","precoCapa":42.5,"precoCDL":15.0},{"sku":33936,"nome":"O chamado da floresta","precoCapa":38.9,"precoCDL":15.0},{"sku":36582,"nome":"Cedrico, o pequeno cavaleiro","precoCapa":39.9,"precoCDL":15.0},{"sku":28571,"nome":"As aventuras de Caramelo: O descobrimento do Brasil - vol. I","precoCapa":37.9,"precoCDL":15.0},{"sku":28662,"nome":"Branca de Neve","precoCapa":37.9,"precoCDL":15.0},{"sku":36615,"nome":"A história de Keesh","precoCapa":37.9,"precoCDL":15.0},{"sku":36673,"nome":"A Ilha dos Nove Redemoinhos","precoCapa":37.9,"precoCDL":15.0},{"sku":28087,"nome":"A história de Pedro Coelho","precoCapa":37.9,"precoCDL":15.0},{"sku":28226,"nome":"A bruxa e o poeta","precoCapa":42.5,"precoCDL":15.0},{"sku":34314,"nome":"As aventuras de Caramelo: Saci e o Lobisomem, vol. V","precoCapa":37.9,"precoCDL":15.0},{"sku":34746,"nome":"O brilhante Roberto","precoCapa":37.9,"precoCDL":15.0},{"sku":35230,"nome":"A história da pequena sereia","precoCapa":37.9,"precoCDL":15.0},{"sku":35576,"nome":"O livro das feras","precoCapa":37.9,"precoCDL":15.0},{"sku":32401,"nome":"João e o pé de feijão","precoCapa":37.9,"precoCDL":15.0},{"sku":35878,"nome":"A noite de natal","precoCapa":37.9,"precoCDL":15.0},{"sku":35879,"nome":"As aventuras de Caramelo: o vira-lata que salvou o Natal, Vol. vII","precoCapa":39.9,"precoCDL":15.0},{"sku":35973,"nome":"O pinheirinho","precoCapa":34.9,"precoCDL":15.0},{"sku":36511,"nome":"O melhor irmão do mundo / A melhor irmã do mundo","precoCapa":26.9,"precoCDL":10.0},{"sku":36675,"nome":"O chá de Sofia","precoCapa":34.9,"precoCDL":15.0},{"sku":34420,"nome":"O nabo gigante","precoCapa":37.5,"precoCDL":15.0},{"sku":35616,"nome":"As aventuras de Caramelo: Supermelo, o herói de patas - vol. VI","precoCapa":37.5,"precoCDL":15.0},{"sku":35736,"nome":"Onde existe amor, Deus aí está","precoCapa":37.9,"precoCDL":15.0},{"sku":32487,"nome":"A Rainha da Neve","precoCapa":37.9,"precoCDL":15.0},{"sku":30886,"nome":"Rapunzel","precoCapa":37.9,"precoCDL":15.0},{"sku":31263,"nome":"O príncipe feliz","precoCapa":37.9,"precoCDL":15.0},{"sku":33473,"nome":"Os três porquinhos","precoCapa":37.9,"precoCDL":15.0},{"sku":32557,"nome":"As aventuras de Caramelo: Aladim e a lâmpada mágica - vol. IV","precoCapa":37.9,"precoCDL":15.0},{"sku":33758,"nome":"O amigo dedicado","precoCapa":37.9,"precoCDL":15.0},{"sku":34941,"nome":"Histórias de Foxwood - A regata de Foxwood","precoCapa":39.9,"precoCDL":15.0},{"sku":35624,"nome":"Histórias de Foxwood - O tesouro de Foxwood","precoCapa":39.9,"precoCDL":15.0},{"sku":35752,"nome":"Histórias de Foxwood - A surpresa de Foxwood","precoCapa":39.9,"precoCDL":15.0},{"sku":36699,"nome":"Histórias de Foxwood - Os contrabandistas de Foxwood","precoCapa":39.9,"precoCDL":15.0},{"sku":36578,"nome":"A viagem de Lili ao redor do mundo","precoCapa":37.9,"precoCDL":15.0},{"sku":34209,"nome":"Histórias de Foxwood - Roubo em Foxwood","precoCapa":39.9,"precoCDL":15.0},{"sku":29813,"nome":"O Gigante Egoísta","precoCapa":34.9,"precoCDL":15.0},{"sku":32683,"nome":"A história do esquilo Joselito","precoCapa":34.9,"precoCDL":15.0},{"sku":35315,"nome":"A última história do Vovô","precoCapa":34.9,"precoCDL":15.0},{"sku":34212,"nome":"O filhote de elefante","precoCapa":34.9,"precoCDL":15.0},{"sku":35051,"nome":"Ana de pano aprende uma lição","precoCapa":34.9,"precoCDL":15.0},{"sku":35687,"nome":"A origem dos tatus","precoCapa":34.9,"precoCDL":15.0},{"sku":32682,"nome":"Um Natal Feliz","precoCapa":34.9,"precoCDL":15.0},{"sku":32591,"nome":"O caminho para Belém","precoCapa":34.9,"precoCDL":15.0},{"sku":32684,"nome":"Esqueceram do Natal","precoCapa":34.9,"precoCDL":15.0},{"sku":33455,"nome":"A Bela e a Fera","precoCapa":34.9,"precoCDL":15.0},{"sku":33952,"nome":"O esquilo de Sofia","precoCapa":34.9,"precoCDL":15.0},{"sku":28701,"nome":"A boneca de cera","precoCapa":34.9,"precoCDL":15.0},{"sku":31756,"nome":"Sofia e os lobos","precoCapa":34.9,"precoCDL":15.0},{"sku":27130,"nome":"O Rouxinol e a Rosa","precoCapa":34.9,"precoCDL":15.0},{"sku":35591,"nome":"A princesa flutuante","precoCapa":32.5,"precoCDL":10.0},{"sku":31026,"nome":"O dragão do meu pai","precoCapa":32.5,"precoCDL":10.0},{"sku":36698,"nome":"Tom Chist e o baú de tesouro","precoCapa":32.5,"precoCDL":10.0},{"sku":33248,"nome":"Os dragões de Terrazul","precoCapa":32.5,"precoCDL":10.0},{"sku":36583,"nome":"Ana de pano, vol. 2: Ana de pano ao resgate!","precoCapa":34.9,"precoCDL":15.0},{"sku":28400,"nome":"O nome das coisas: Tá na mesa!","precoCapa":26.9,"precoCDL":10.0},{"sku":28777,"nome":"O nome das coisas: Compras na feira","precoCapa":26.9,"precoCDL":10.0},{"sku":34532,"nome":"Onde está o esquilo?","precoCapa":26.9,"precoCDL":10.0},{"sku":27131,"nome":"Meu primeiro livro de cachorros","precoCapa":26.9,"precoCDL":10.0},{"sku":32267,"nome":"Eu só queria dormir!","precoCapa":26.9,"precoCDL":10.0},{"sku":34165,"nome":"Como é bom aprender: Números","precoCapa":26.9,"precoCDL":10.0},{"sku":35269,"nome":"Opostos: Aniversário de urso","precoCapa":26.9,"precoCDL":10.0},{"sku":35524,"nome":"O nome das coisas: Parquinho","precoCapa":26.9,"precoCDL":10.0},{"sku":35611,"nome":"A cigarra e as formigas","precoCapa":26.9,"precoCDL":10.0},{"sku":35686,"nome":"Os escavadores","precoCapa":26.9,"precoCDL":10.0},{"sku":35975,"nome":"Onde está? Especial de Natal","precoCapa":26.9,"precoCDL":10.0},{"sku":36979,"nome":"Como é bom aprender: cores","precoCapa":26.9,"precoCDL":10.0},{"sku":29032,"nome":"O nome das coisas: Hora do banho","precoCapa":26.9,"precoCDL":10.0},{"sku":29792,"nome":"O nome das coisas: É Natal","precoCapa":26.9,"precoCDL":10.0},{"sku":30490,"nome":"O nome das coisas: Hora de dormir","precoCapa":26.9,"precoCDL":10.0},{"sku":30505,"nome":"O nome das coisas: Passeio no Zoológico","precoCapa":26.9,"precoCDL":10.0},{"sku":31199,"nome":"Meu primeiro livro de esportes","precoCapa":26.9,"precoCDL":10.0},{"sku":32438,"nome":"Onde está Roseta?","precoCapa":26.9,"precoCDL":10.0},{"sku":32578,"nome":"Opostos: vida de urso","precoCapa":26.9,"precoCDL":10.0},{"sku":32628,"nome":"O melhor presente de Natal","precoCapa":26.9,"precoCDL":10.0},{"sku":33755,"nome":"Tesouro poético da infância: Trava língua","precoCapa":26.9,"precoCDL":10.0},{"sku":35055,"nome":"Tesouro poético da infância: Lengalengas","precoCapa":26.9,"precoCDL":10.0},{"sku":34707,"nome":"O nome das coisas: Vamos ao circo","precoCapa":26.9,"precoCDL":10.0},{"sku":35049,"nome":"Meu primeiro livro de profissões","precoCapa":26.9,"precoCDL":10.0},{"sku":35052,"nome":"A festa do rei urso","precoCapa":26.9,"precoCDL":10.0},{"sku":28700,"nome":"O nome das coisas: Passeio na fazenda","precoCapa":26.9,"precoCDL":10.0},{"sku":30782,"nome":"Meu primeiro livro de meios de transporte","precoCapa":26.9,"precoCDL":10.0},{"sku":33451,"nome":"O nome das coisas: Vamos à praia!","precoCapa":26.9,"precoCDL":10.0},{"sku":33582,"nome":"Meu primeiro livro de música","precoCapa":26.9,"precoCDL":10.0},{"sku":36672,"nome":"Meu primeiro livro de astronomia","precoCapa":26.9,"precoCDL":10.0},{"sku":30680,"nome":"Onde está Mimi?","precoCapa":26.9,"precoCDL":10.0},{"sku":31730,"nome":"O nome das coisas: Futebol","precoCapa":26.9,"precoCDL":10.0},{"sku":33188,"nome":"Onde está Totó?","precoCapa":26.9,"precoCDL":10.0},{"sku":33332,"nome":"A tartaruga e a lebre","precoCapa":26.9,"precoCDL":10.0},{"sku":29788,"nome":"A história de São Nicolau","precoCapa":34.9,"precoCDL":15.0},{"sku":30069,"nome":"A estrela, um sonho de infância","precoCapa":34.9,"precoCDL":15.0},{"sku":30070,"nome":"As aventuras de Caramelo: A chegada da corte portuguesa ao Brasil - vol. II","precoCapa":37.9,"precoCDL":15.0},{"sku":30586,"nome":"A roupa nova do imperador","precoCapa":37.9,"precoCDL":15.0},{"sku":30851,"nome":"A porta aberta","precoCapa":34.9,"precoCDL":15.0},{"sku":31030,"nome":"Cadê o grito?","precoCapa":42.5,"precoCDL":15.0},{"sku":31046,"nome":"Aventuras de Tom Sawyer","precoCapa":64.9,"precoCDL":20.0},{"sku":31181,"nome":"Alice no País das Maravilhas","precoCapa":75.9,"precoCDL":20.0},{"sku":31375,"nome":"A princesa e o goblin","precoCapa":49.9,"precoCDL":20.0},{"sku":31522,"nome":"As aventuras de Caramelo: Olimpíada na Grécia Antiga - vol. III","precoCapa":37.9,"precoCDL":15.0},{"sku":31645,"nome":"Cinderela","precoCapa":37.9,"precoCDL":15.0},{"sku":31841,"nome":"Meu primeiro livro de gatos","precoCapa":26.9,"precoCDL":10.0},{"sku":31925,"nome":"Elmer e o dragão","precoCapa":32.5,"precoCDL":10.0},{"sku":32047,"nome":"Chapeuzinho Vermelho","precoCapa":37.9,"precoCDL":15.0}];
+
+// ═══════════════════════════════════════════════════
+//  SUPABASE
+// ═══════════════════════════════════════════════════
+let SB_URL = '', SB_KEY = '';
+
+function sbFetch(path, opts={}) {
+  return fetch(SB_URL + '/rest/v1/' + path, {
+    ...opts,
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + SB_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': opts.prefer || 'return=representation',
+      ...(opts.headers||{})
+    }
+  });
+}
+
+// ── Config
+function salvarConfig() {
+  const url = document.getElementById('cfg-url').value.trim().replace(/\/$/,'');
+  const key = document.getElementById('cfg-key').value.trim();
+  if (!url || !key) { alert('Preencha a URL e a chave.'); return; }
+  SB_URL = url; SB_KEY = key;
+  localStorage.setItem('cdl_sb_url', url);
+  localStorage.setItem('cdl_sb_key', key);
+  iniciar();
+}
+
+// ═══════════════════════════════════════════════════
+//  ESTADO LOCAL (cache dos dados)
+// ═══════════════════════════════════════════════════
+let estoque = {};   // sku -> qtd
+let historico = []; // array de objetos
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+async function iniciar() {
+  document.getElementById('setup-screen').classList.remove('open');
+  document.getElementById('loading-screen').classList.add('open');
+  try {
+    await carregarEstoque();
+    await carregarHistorico();
+    document.getElementById('loading-screen').classList.remove('open');
+    setConnStatus(true);
+    populateSelects();
+    renderEstoque();
+    renderInicial();
+    updateStats();
+  } catch(e) {
+    document.getElementById('loading-screen').classList.remove('open');
+    setConnStatus(false);
+    showToast('Erro ao conectar. Verifique a URL e a chave.', 'error');
+    document.getElementById('setup-screen').classList.add('open');
+  }
+}
+
+function setConnStatus(ok) {
+  const el = document.getElementById('conn-status');
+  el.className = 'conn-status ' + (ok ? 'ok' : 'err');
+  el.innerHTML = `<div class="conn-dot"></div><span>${ok ? 'Online' : 'Offline'}</span>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  SUPABASE: ESTOQUE
+// ═══════════════════════════════════════════════════
+async function carregarEstoque() {
+  const res = await sbFetch('estoque?select=sku,quantidade');
+  if (!res.ok) throw new Error('Erro estoque');
+  const data = await res.json();
+  estoque = {};
+  LIVROS.forEach(l => estoque[l.sku] = 0);
+  data.forEach(r => estoque[r.sku] = r.quantidade);
+}
+
+async function upsertEstoque(sku, qtd) {
+  const res = await sbFetch('estoque', {
+    method: 'POST',
+    prefer: 'resolution=merge-duplicates,return=representation',
+    body: JSON.stringify({ sku, quantidade: qtd })
+  });
+  if (!res.ok) throw new Error('Erro ao salvar estoque');
+  estoque[sku] = qtd;
+}
+
+// ═══════════════════════════════════════════════════
+//  SUPABASE: HISTÓRICO
+// ═══════════════════════════════════════════════════
+async function carregarHistorico() {
+  const res = await sbFetch('historico?select=*&order=criado_em.desc&limit=300');
+  if (!res.ok) throw new Error('Erro histórico');
+  historico = await res.json();
+}
+
+async function inserirHistorico(mov) {
+  const res = await sbFetch('historico', {
+    method: 'POST',
+    body: JSON.stringify(mov)
+  });
+  if (!res.ok) throw new Error('Erro ao salvar histórico');
+  const [novo] = await res.json();
+  historico.unshift(novo);
+}
+
+// ═══════════════════════════════════════════════════
+//  ESTOQUE INICIAL
+// ═══════════════════════════════════════════════════
+function renderInicial() {
+  const q = (document.getElementById('search-init').value||'').toLowerCase();
+  const livros = LIVROS.filter(l => !q || l.nome.toLowerCase().includes(q) || String(l.sku).includes(q));
+  document.getElementById('init-grid').innerHTML = livros.map(l => `
+    <div class="init-item">
+      <div style="flex:1;min-width:0">
+        <div class="init-nome">${l.nome}</div>
+        <div style="display:flex;gap:8px;margin-top:3px">
+          <span class="init-sku">SKU ${l.sku}</span>
+          <span class="init-preco">R$ ${l.precoCDL.toFixed(2).replace('.',',')}</span>
+        </div>
+      </div>
+      <input type="number" min="0" class="init-input" id="init-${l.sku}" value="${estoque[l.sku]||0}">
+    </div>`).join('');
+}
+
+function zerarTodos() {
+  LIVROS.forEach(l => {
+    const inp = document.getElementById('init-'+l.sku);
+    if (inp) inp.value = 0;
+  });
+}
+
+async function salvarEstoqueInicial() {
+  const btn = document.querySelector('#sec-inicial .btn-primary');
+  btn.textContent = '⏳ Salvando...'; btn.disabled = true;
+  try {
+    const ops = LIVROS.map(l => {
+      const v = parseInt(document.getElementById('init-'+l.sku)?.value)||0;
+      return { sku: l.sku, quantidade: v };
+    });
+    const res = await sbFetch('estoque', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=representation',
+      body: JSON.stringify(ops)
+    });
+    if (!res.ok) throw new Error();
+    await carregarEstoque();
+    updateStats();
+    renderEstoque();
+    showToast('Estoque inicial salvo com sucesso! ✓', 'success');
+  } catch(e) {
+    showToast('Erro ao salvar estoque. Tente novamente.', 'error');
+  }
+  btn.textContent = '💾 Salvar Estoque Inicial'; btn.disabled = false;
+}
+
+// ═══════════════════════════════════════════════════
+//  ESTOQUE TABLE
+// ═══════════════════════════════════════════════════
+function renderEstoque() {
+  const q = (document.getElementById('search-estoque').value||'').toLowerCase();
+  const f = document.getElementById('filter-estoque').value;
+  const fp = document.getElementById('filter-preco').value;
+  let livros = LIVROS.filter(l => {
+    const e = estoque[l.sku]||0;
+    if (q && !l.nome.toLowerCase().includes(q) && !String(l.sku).includes(q)) return false;
+    if (f === 'ok' && e === 0) return false;
+    if (f === 'baixo' && (e === 0 || e > 3)) return false;
+    if (f === 'zero' && e !== 0) return false;
+    if (fp !== 'todos' && l.precoCDL !== parseFloat(fp)) return false;
+    return true;
+  });
+  const tbody = document.getElementById('tbody-estoque');
+  if (!livros.length) { tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state"><div class="emoji">📭</div><p>Nenhum livro encontrado</p></div></td></tr>`; return; }
+  tbody.innerHTML = livros.map(l => {
+    const e = estoque[l.sku]||0;
+    const cls = e===0?'zero':e<=3?'baixo':'ok';
+    const badge = e===0?'<span class="badge badge-zero">Sem estoque</span>':e<=3?'<span class="badge badge-baixo">Baixo</span>':'<span class="badge badge-ok">OK</span>';
+    return `<tr>
+      <td class="td-sku">${l.sku}</td>
+      <td class="td-nome">${l.nome}</td>
+      <td class="td-preco">R$ ${l.precoCDL.toFixed(2).replace('.',',')}</td>
+      <td class="estoque-${cls}" style="font-weight:700">${e}</td>
+      <td>${badge}</td>
+      <td>
+        <button class="btn-action entrada" onclick="quickMove(${l.sku},'entrada')">+</button>
+        <button class="btn-action venda" onclick="quickMove(${l.sku},'saida')">−</button>
+      </td></tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  QUICK MOVE (botões + / − da tabela)
+// ═══════════════════════════════════════════════════
+let pendingMove = null;
+function quickMove(sku, tipo) {
+  const livro = LIVROS.find(l=>l.sku===sku);
+  const e = estoque[sku]||0;
+  if (tipo==='saida' && e===0) { showToast('Estoque zerado para este livro!','error'); return; }
+  document.getElementById('modal-title').textContent = tipo==='entrada'?'Registrar Entrada':'Registrar Venda';
+  document.getElementById('modal-body').textContent = `"${livro.nome}"`;
+  document.getElementById('modal-extra').innerHTML = `<div class="form-group" style="margin-bottom:0"><label>Quantidade</label><input type="number" id="modal-qtd" min="1" max="${tipo==='saida'?e:9999}" value="1" style="margin-top:6px"></div>`;
+  const btn = document.getElementById('modal-confirm');
+  btn.className = 'btn-primary '+(tipo==='entrada'?'success':'danger');
+  btn.textContent = tipo==='entrada'?'Confirmar Entrada':'Confirmar Venda';
+  pendingMove = {sku, tipo, nome:livro.nome};
+  btn.onclick = confirmQuickMove;
+  document.getElementById('modal').classList.add('open');
+}
+
+async function confirmQuickMove() {
+  const qtd = parseInt(document.getElementById('modal-qtd').value)||1;
+  const {sku, tipo, nome} = pendingMove;
+  const e = estoque[sku]||0;
+  if (tipo==='saida'&&qtd>e) { showToast('Quantidade maior que o estoque!','error'); return; }
+  closeModal();
+  const novoQtd = tipo==='entrada' ? e+qtd : e-qtd;
+  try {
+    await upsertEstoque(sku, novoQtd);
+    await inserirHistorico({tipo, sku, nome, qtd, data: new Date().toISOString().split('T')[0], obs:'', colegio:''});
+    renderEstoque(); updateStats(); renderAlertas();
+    showToast(tipo==='entrada'?`+${qtd} unidade(s) adicionada(s) ✓`:`−${qtd} vendida(s) ✓`,'success');
+  } catch(err) { showToast('Erro ao salvar. Tente novamente.','error'); await carregarEstoque(); renderEstoque(); }
+}
+
+// ═══════════════════════════════════════════════════
+//  FORMULÁRIO MOVIMENTOS
+// ═══════════════════════════════════════════════════
+function populateSelects() {
+  ['entrada-livro','saida-livro'].forEach(id => {
+    document.getElementById(id).innerHTML = '<option value="">Selecione o livro...</option>' +
+      LIVROS.map(l=>`<option value="${l.sku}">${l.nome} — R$ ${l.precoCDL.toFixed(2).replace('.',',')}</option>`).join('');
+  });
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('entrada-data').value = today;
+  document.getElementById('saida-data').value = today;
+}
+
+function updatePreview(tipo) {
+  const sku = parseInt(document.getElementById(`${tipo}-livro`).value);
+  const box = document.getElementById(`preview-${tipo}`);
+  if (!sku) { box.className='preview-box'; box.innerHTML='Selecione um livro para ver os detalhes'; return; }
+  const l = LIVROS.find(x=>x.sku===sku);
+  const e = estoque[sku]||0;
+  const cls = e===0?'estoque-zero':e<=3?'estoque-baixo':'estoque-ok';
+  box.className='preview-box filled';
+  box.innerHTML=`<div class="preview-nome">${l.nome}</div><div class="preview-info">SKU: ${l.sku} · CDL: R$ ${l.precoCDL.toFixed(2).replace('.',',')} · Capa: R$ ${l.precoCapa.toFixed(2).replace('.',',')}</div><div class="${cls}" style="font-weight:700;margin-top:6px">Estoque atual: ${e} un.</div>`;
+}
+
+async function registrarMovimento(tipo) {
+  const sku = parseInt(document.getElementById(`${tipo}-livro`).value);
+  const qtd = parseInt(document.getElementById(`${tipo}-qtd`).value)||0;
+  const data = document.getElementById(`${tipo}-data`).value;
+  const obs = document.getElementById(`${tipo}-obs`)?.value||'';
+  const colegio = document.getElementById('saida-colegio')?.value||'';
+  if (!sku) { showToast('Selecione um livro!','error'); return; }
+  if (qtd<1) { showToast('Quantidade deve ser maior que zero!','error'); return; }
+  const livro = LIVROS.find(l=>l.sku===sku);
+  const e = estoque[sku]||0;
+  if (tipo==='saida'&&qtd>e) { showToast(`Estoque insuficiente! Disponível: ${e} un.`,'error'); return; }
+  const novoQtd = tipo==='entrada'?e+qtd:e-qtd;
+  const btn = document.querySelector(`#sec-movimentos .btn-primary.${tipo==='entrada'?'success':'danger'}`);
+  btn.disabled=true; btn.textContent='⏳ Salvando...';
+  try {
+    await upsertEstoque(sku, novoQtd);
+    await inserirHistorico({tipo, sku, nome:livro.nome, qtd, data, obs, colegio});
+    document.getElementById(`${tipo}-livro`).value='';
+    document.getElementById(`${tipo}-qtd`).value=1;
+    if (document.getElementById(`${tipo}-obs`)) document.getElementById(`${tipo}-obs`).value='';
+    if (document.getElementById('saida-colegio')) document.getElementById('saida-colegio').value='';
+    updatePreview(tipo);
+    renderEstoque(); updateStats(); renderAlertas();
+    showToast(tipo==='entrada'?`Entrada de ${qtd} un. de "${livro.nome}" registrada! ✓`:`Venda de ${qtd} un. de "${livro.nome}" registrada! ✓`,'success');
+  } catch(err) { showToast('Erro ao registrar. Tente novamente.','error'); }
+  btn.disabled=false; btn.textContent=tipo==='entrada'?'✔ Registrar Entrada':'✔ Registrar Venda';
+}
+
+// ═══════════════════════════════════════════════════
+//  HISTÓRICO
+// ═══════════════════════════════════════════════════
+function renderHistorico() {
+  const q=(document.getElementById('search-hist').value||'').toLowerCase();
+  const f=document.getElementById('filter-hist').value;
+  const hist=historico.filter(h=>{
+    if(q&&!h.nome.toLowerCase().includes(q)&&!String(h.sku).includes(q)&&!(h.colegio||'').toLowerCase().includes(q))return false;
+    if(f!=='todos'&&h.tipo!==f)return false;
+    return true;
+  });
+  const el=document.getElementById('hist-list');
+  if(!hist.length){el.innerHTML=`<div class="empty-state"><div class="emoji">📋</div><p>Nenhum movimento registrado.</p></div>`;return;}
+  el.innerHTML=hist.map(h=>{
+    const dataFmt=h.data?new Date(h.data+'T12:00:00').toLocaleDateString('pt-BR'):'—';
+    const extra=h.colegio?`<br>🏫 ${h.colegio}`:h.obs?`<br>📝 ${h.obs}`:'';
+    return `<div class="hist-item">
+      <div class="hist-icon ${h.tipo}">${h.tipo==='entrada'?'📥':'📤'}</div>
+      <div class="hist-body"><div class="hist-nome">${h.nome}</div><div class="hist-detalhe">SKU ${h.sku}${extra}</div></div>
+      <div class="hist-qtd ${h.tipo}">${h.tipo==='entrada'?'+':'−'}${h.qtd}</div>
+      <div class="hist-time">${dataFmt}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  ALERTAS
+// ═══════════════════════════════════════════════════
+function renderAlertas() {
+  const zeros=LIVROS.filter(l=>(estoque[l.sku]||0)===0);
+  const baixos=LIVROS.filter(l=>{const e=estoque[l.sku]||0;return e>0&&e<=3;});
+  const el=document.getElementById('alerts-grid');
+  if(!zeros.length&&!baixos.length){el.innerHTML=`<div class="empty-state"><div class="emoji">✅</div><p>Nenhum alerta — estoque em dia!</p></div>`;return;}
+  const render=(livros,tipo)=>livros.map(l=>{
+    const e=estoque[l.sku]||0;
+    return `<div class="alert-item ${tipo==='zero'?'zero':''}">
+      <div style="flex:1"><div class="alert-nome">${l.nome}</div><div class="alert-info">SKU ${l.sku} · R$ ${l.precoCDL.toFixed(2).replace('.',',')} · ${tipo==='zero'?'Sem estoque':'Estoque baixo'}</div></div>
+      <div class="alert-estoque ${tipo==='zero'?'zero':'baixo'}">${e}</div>
+      <button class="btn-action entrada" onclick="quickMove(${l.sku},'entrada')" style="margin-left:8px">+ Repor</button>
+    </div>`;}).join('');
+  el.innerHTML=
+    (zeros.length?`<div class="section-label" style="color:var(--red)">⛔ Sem estoque (${zeros.length})</div>`+render(zeros,'zero'):'')+
+    (baixos.length?`<div class="section-label" style="color:var(--orange)">⚠ Estoque baixo (${baixos.length})</div>`+render(baixos,'baixo'):'');
+}
+
+// ═══════════════════════════════════════════════════
+//  STATS
+// ═══════════════════════════════════════════════════
+function updateStats() {
+  document.getElementById('stat-titulos').textContent=LIVROS.length;
+  document.getElementById('stat-unidades').textContent=LIVROS.reduce((s,l)=>s+(estoque[l.sku]||0),0);
+  document.getElementById('stat-baixo').textContent=LIVROS.filter(l=>{const e=estoque[l.sku]||0;return e>0&&e<=3;}).length;
+  document.getElementById('stat-zero').textContent=LIVROS.filter(l=>(estoque[l.sku]||0)===0).length;
+}
+
+// ═══════════════════════════════════════════════════
+//  EXPORTAR CSV
+// ═══════════════════════════════════════════════════
+function exportarCSV() {
+  const rows=[['Tipo','SKU','Título','Quantidade','Data','Colégio','Observação']];
+  historico.forEach(h=>rows.push([h.tipo==='entrada'?'Entrada':'Saída/Venda',h.sku,h.nome,h.qtd,h.data,h.colegio||'',h.obs||'']));
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`historico-cdl-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  showToast('CSV exportado! ✓','success');
+}
+
+// ═══════════════════════════════════════════════════
+//  NAVEGAÇÃO
+// ═══════════════════════════════════════════════════
+function showSection(id, btn) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(id==='historico') renderHistorico();
+  if(id==='alertas') renderAlertas();
+  if(id==='inicial') renderInicial();
+}
+
+// ═══════════════════════════════════════════════════
+//  MODAL / TOAST
+// ═══════════════════════════════════════════════════
+function closeModal(){document.getElementById('modal').classList.remove('open');}
+document.getElementById('modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal();});
+let toastTimer;
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='show'+(type?' '+type:'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{t.className='';},3400);
+}
+
+// ═══════════════════════════════════════════════════
+//  AUTO-LOGIN (se já configurado)
+// ═══════════════════════════════════════════════════
+const savedUrl=localStorage.getItem('cdl_sb_url');
+const savedKey=localStorage.getItem('cdl_sb_key');
+if(savedUrl&&savedKey){
+  SB_URL=savedUrl; SB_KEY=savedKey;
+  document.getElementById('cfg-url').value=savedUrl;
+  document.getElementById('cfg-key').value=savedKey;
+  iniciar();
+}
+</script>
+</body>
+</html>
