@@ -843,7 +843,9 @@ LIVROS.forEach(l => { if(l.isbn) ISBN_INDEX[l.isbn] = l; });
 // ═══════════════════════════════════════════════════
 //  SUPABASE
 // ═══════════════════════════════════════════════════
-let SB_URL = '', SB_KEY = '', SB_TOKEN = '';
+let SB_URL = 'https://kmkynpcjnlkjxkbxguel.supabase.co';
+let SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtta3lucGNqbmxranhrYnhndWVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MTMyNTUsImV4cCI6MjA4ODM4OTI1NX0.P1Uz7jq8ML9ZUocBYR3pF8CsJvmDf0lkKxpYlxvz6cU';
+let SB_TOKEN = '';
 
 function sbFetch(path, opts={}) {
   return fetch(SB_URL + '/rest/v1/' + path, {
@@ -869,7 +871,6 @@ function salvarConfig() {
   document.getElementById('setup-screen').classList.remove('open');
   document.getElementById('login-screen').classList.add('open');
 }
-
 // ── Autenticação
 async function fazerLogin() {
   const email = document.getElementById('login-email').value.trim();
@@ -1916,31 +1917,22 @@ async function exportarRelatorioXLSX() {
 // ═══════════════════════════════════════════════════
 //  AUTO-LOGIN (se já configurado)
 // ═══════════════════════════════════════════════════
-const savedUrl=localStorage.getItem('cdl_sb_url');
-const savedKey=localStorage.getItem('cdl_sb_key');
-const savedToken=localStorage.getItem('cdl_token');
-const savedEmail=localStorage.getItem('cdl_user_email');
+//  INICIALIZAÇÃO
+// ═══════════════════════════════════════════════════
+const savedToken = localStorage.getItem('cdl_token');
+const savedEmail = localStorage.getItem('cdl_user_email');
 
-if(savedUrl&&savedKey){
-  SB_URL=savedUrl; SB_KEY=savedKey;
-  document.getElementById('cfg-url').value=savedUrl;
-  document.getElementById('cfg-key').value=savedKey;
-  if(savedToken){
-    // Sessão salva — tentar entrar direto
-    SB_TOKEN=savedToken;
-    if(savedEmail) document.getElementById('header-usuario').textContent=savedEmail.split('@')[0];
-    iniciar().catch(()=>{
-      // Token expirado — pedir login novamente
-      localStorage.removeItem('cdl_token');
-      document.getElementById('login-screen').classList.add('open');
-    });
-  } else {
-    // Configurado mas sem sessão — mostrar login
+if(savedToken){
+  // Sessão salva — tentar entrar direto
+  SB_TOKEN = savedToken;
+  if(savedEmail) document.getElementById('header-usuario').textContent = savedEmail.split('@')[0];
+  iniciar().catch(()=>{
+    localStorage.removeItem('cdl_token');
     document.getElementById('login-screen').classList.add('open');
-  }
+  });
 } else {
-  // Primeira vez — mostrar setup
-  document.getElementById('setup-screen').classList.add('open');
+  // Sem sessão — mostrar login
+  document.getElementById('login-screen').classList.add('open');
 }
 </script>
 </body>
