@@ -379,6 +379,7 @@ CREATE TABLE historico (
     </div>
     <nav class="nav-tabs">
       <button class="nav-tab active"  onclick="showSection('estoque',this)">📦 Estoque</button>
+      <button class="nav-tab" onclick="showSection('scanner',this)">🔫 Venda Rápida</button>
       <button class="nav-tab" onclick="showSection('movimentos',this)">↕ Movimentos</button>
       <button class="nav-tab" onclick="showSection('historico',this)">📋 Histórico</button>
       <button class="nav-tab" onclick="showSection('alertas',this)">🔔 Alertas</button>
@@ -394,6 +395,79 @@ CREATE TABLE historico (
     <div class="summary-card orange"><div class="label">Estoque Baixo</div><div class="value" id="stat-baixo">—</div><div class="sub">abaixo de 3 unidades</div></div>
     <div class="summary-card alert"><div class="label">Sem Estoque</div><div class="value" id="stat-zero">—</div><div class="sub">precisam reposição</div></div>
   </div>
+
+  <!-- VENDA RÁPIDA / SCANNER -->
+  <section class="section" id="sec-scanner">
+    <div class="section-title">🔫 Venda Rápida</div>
+    <div class="section-sub">Aponte o leitor para o código de barras do livro para registrar a venda automaticamente.</div>
+
+    <div class="form-grid">
+      <!-- Painel do scanner -->
+      <div class="form-card" style="border-top: 4px solid var(--gold);">
+        <h3>📷 Leitura do Código</h3>
+        <p class="form-desc">Clique no campo abaixo e use o leitor de código de barras. O livro será identificado automaticamente.</p>
+
+        <div class="form-group">
+          <label>Campo de Leitura</label>
+          <input type="text" id="scanner-input"
+            placeholder="Aponte o leitor aqui e leia o código..."
+            oninput="onScannerInput()"
+            onkeydown="onScannerKey(event)"
+            autocomplete="off" autocorrect="off" spellcheck="false"
+            style="font-size:1.1rem;font-weight:600;letter-spacing:.05em;background:#fffef5;border-color:var(--gold)">
+        </div>
+
+        <!-- Preview do livro identificado -->
+        <div id="scanner-preview" class="preview-box" style="min-height:100px">
+          <span>Aguardando leitura do código de barras...</span>
+        </div>
+
+        <br>
+        <!-- Formulário de confirmação (aparece após leitura) -->
+        <div id="scanner-form" style="display:none">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Quantidade</label>
+              <input type="number" id="scanner-qtd" min="1" value="1"
+                style="font-size:1.2rem;font-weight:700;text-align:center">
+            </div>
+            <div class="form-group">
+              <label>Data</label>
+              <input type="date" id="scanner-data">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Colégio / Turma</label>
+            <input type="text" id="scanner-colegio" list="colegios-list" placeholder="Ex: Colégio São Paulo - 3º ano">
+            <datalist id="colegios-list"></datalist>
+          </div>
+          <button class="btn-primary danger" onclick="confirmarVendaScanner()" id="scanner-btn-confirmar">
+            ✔ Confirmar Venda
+          </button>
+          <button class="btn-secondary" onclick="limparScanner()" style="width:100%;margin-top:8px">
+            ✕ Cancelar / Nova leitura
+          </button>
+        </div>
+      </div>
+
+      <!-- Últimas vendas da sessão -->
+      <div class="form-card">
+        <h3>🧾 Vendas desta sessão</h3>
+        <p class="form-desc">Registros feitos desde que você abriu o sistema.</p>
+        <div id="scanner-session-list" style="display:flex;flex-direction:column;gap:8px;max-height:480px;overflow-y:auto">
+          <div class="empty-state" style="padding:24px">
+            <div class="emoji">🛒</div>
+            <p>Nenhuma venda ainda</p>
+          </div>
+        </div>
+        <div id="scanner-session-total" style="display:none;margin-top:16px;padding:12px 16px;background:var(--green-light);border-radius:8px;text-align:center">
+          <div style="font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--green);font-weight:600">Total da sessão</div>
+          <div style="font-family:'Fraunces',serif;font-size:1.6rem;font-weight:700;color:var(--green)" id="scanner-total-valor">R$ 0,00</div>
+          <div style="font-size:.78rem;color:var(--muted)" id="scanner-total-livros">0 livros vendidos</div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- ESTOQUE -->
   <section class="section active" id="sec-estoque">
@@ -518,7 +592,11 @@ CREATE TABLE historico (
 // ═══════════════════════════════════════════════════
 //  CATÁLOGO DE LIVROS
 // ═══════════════════════════════════════════════════
-const LIVROS = [{"sku":28702,"nome":"Pinóquio","precoCapa":89.9,"precoCDL":25.0},{"sku":33480,"nome":"Poliana","precoCapa":89.9,"precoCDL":20.0},{"sku":34818,"nome":"Rebeca do vale do sol","precoCapa":94.9,"precoCDL":25.0},{"sku":33399,"nome":"Cinco crianças e um segredo","precoCapa":89.9,"precoCDL":20.0},{"sku":34080,"nome":"A princesa e Curdie","precoCapa":86.9,"precoCDL":20.0},{"sku":30523,"nome":"O Mágico de Oz","precoCapa":74.9,"precoCDL":25.0},{"sku":32219,"nome":"O vento nos salgueiros","precoCapa":79.9,"precoCDL":20.0},{"sku":35047,"nome":"Rei Artur e os cavaleiros da távola redonda","precoCapa":69.9,"precoCDL":20.0},{"sku":35976,"nome":"A história de um quebra-nozes e outros contos de natal","precoCapa":59.9,"precoCDL":20.0},{"sku":35305,"nome":"Caninos brancos","precoCapa":54.9,"precoCDL":20.0},{"sku":31456,"nome":"Moby Dick","precoCapa":69.9,"precoCDL":25.0},{"sku":35731,"nome":"Bambi: uma história de vida na floresta","precoCapa":75.9,"precoCDL":20.0},{"sku":29322,"nome":"Poesias infantis","precoCapa":69.9,"precoCDL":20.0},{"sku":35317,"nome":"A estrela azul","precoCapa":75.9,"precoCDL":20.0},{"sku":34650,"nome":"Otto da mão de prata","precoCapa":61.2,"precoCDL":20.0},{"sku":29100,"nome":"O lago secreto","precoCapa":59.9,"precoCDL":20.0},{"sku":30413,"nome":"Uma cantiga de Natal","precoCapa":44.9,"precoCDL":15.0},{"sku":33775,"nome":"Travando línguas travessas","precoCapa":49.9,"precoCDL":20.0},{"sku":34732,"nome":"O café da manhã da família 14","precoCapa":37.9,"precoCDL":15.0},{"sku":32186,"nome":"Rikki-Tikki-Tavi","precoCapa":42.5,"precoCDL":15.0},{"sku":28749,"nome":"Os Coloridos da Fada Tarsila","precoCapa":42.5,"precoCDL":15.0},{"sku":33936,"nome":"O chamado da floresta","precoCapa":38.9,"precoCDL":15.0},{"sku":36582,"nome":"Cedrico, o pequeno cavaleiro","precoCapa":39.9,"precoCDL":15.0},{"sku":28571,"nome":"As aventuras de Caramelo: O descobrimento do Brasil - vol. I","precoCapa":37.9,"precoCDL":15.0},{"sku":28662,"nome":"Branca de Neve","precoCapa":37.9,"precoCDL":15.0},{"sku":36615,"nome":"A história de Keesh","precoCapa":37.9,"precoCDL":15.0},{"sku":36673,"nome":"A Ilha dos Nove Redemoinhos","precoCapa":37.9,"precoCDL":15.0},{"sku":28087,"nome":"A história de Pedro Coelho","precoCapa":37.9,"precoCDL":15.0},{"sku":28226,"nome":"A bruxa e o poeta","precoCapa":42.5,"precoCDL":15.0},{"sku":34314,"nome":"As aventuras de Caramelo: Saci e o Lobisomem, vol. V","precoCapa":37.9,"precoCDL":15.0},{"sku":34746,"nome":"O brilhante Roberto","precoCapa":37.9,"precoCDL":15.0},{"sku":35230,"nome":"A história da pequena sereia","precoCapa":37.9,"precoCDL":15.0},{"sku":35576,"nome":"O livro das feras","precoCapa":37.9,"precoCDL":15.0},{"sku":32401,"nome":"João e o pé de feijão","precoCapa":37.9,"precoCDL":15.0},{"sku":35878,"nome":"A noite de natal","precoCapa":37.9,"precoCDL":15.0},{"sku":35879,"nome":"As aventuras de Caramelo: o vira-lata que salvou o Natal, Vol. vII","precoCapa":39.9,"precoCDL":15.0},{"sku":35973,"nome":"O pinheirinho","precoCapa":34.9,"precoCDL":15.0},{"sku":36511,"nome":"O melhor irmão do mundo / A melhor irmã do mundo","precoCapa":26.9,"precoCDL":10.0},{"sku":36675,"nome":"O chá de Sofia","precoCapa":34.9,"precoCDL":15.0},{"sku":34420,"nome":"O nabo gigante","precoCapa":37.5,"precoCDL":15.0},{"sku":35616,"nome":"As aventuras de Caramelo: Supermelo, o herói de patas - vol. VI","precoCapa":37.5,"precoCDL":15.0},{"sku":35736,"nome":"Onde existe amor, Deus aí está","precoCapa":37.9,"precoCDL":15.0},{"sku":32487,"nome":"A Rainha da Neve","precoCapa":37.9,"precoCDL":15.0},{"sku":30886,"nome":"Rapunzel","precoCapa":37.9,"precoCDL":15.0},{"sku":31263,"nome":"O príncipe feliz","precoCapa":37.9,"precoCDL":15.0},{"sku":33473,"nome":"Os três porquinhos","precoCapa":37.9,"precoCDL":15.0},{"sku":32557,"nome":"As aventuras de Caramelo: Aladim e a lâmpada mágica - vol. IV","precoCapa":37.9,"precoCDL":15.0},{"sku":33758,"nome":"O amigo dedicado","precoCapa":37.9,"precoCDL":15.0},{"sku":34941,"nome":"Histórias de Foxwood - A regata de Foxwood","precoCapa":39.9,"precoCDL":15.0},{"sku":35624,"nome":"Histórias de Foxwood - O tesouro de Foxwood","precoCapa":39.9,"precoCDL":15.0},{"sku":35752,"nome":"Histórias de Foxwood - A surpresa de Foxwood","precoCapa":39.9,"precoCDL":15.0},{"sku":36699,"nome":"Histórias de Foxwood - Os contrabandistas de Foxwood","precoCapa":39.9,"precoCDL":15.0},{"sku":36578,"nome":"A viagem de Lili ao redor do mundo","precoCapa":37.9,"precoCDL":15.0},{"sku":34209,"nome":"Histórias de Foxwood - Roubo em Foxwood","precoCapa":39.9,"precoCDL":15.0},{"sku":29813,"nome":"O Gigante Egoísta","precoCapa":34.9,"precoCDL":15.0},{"sku":32683,"nome":"A história do esquilo Joselito","precoCapa":34.9,"precoCDL":15.0},{"sku":35315,"nome":"A última história do Vovô","precoCapa":34.9,"precoCDL":15.0},{"sku":34212,"nome":"O filhote de elefante","precoCapa":34.9,"precoCDL":15.0},{"sku":35051,"nome":"Ana de pano aprende uma lição","precoCapa":34.9,"precoCDL":15.0},{"sku":35687,"nome":"A origem dos tatus","precoCapa":34.9,"precoCDL":15.0},{"sku":32682,"nome":"Um Natal Feliz","precoCapa":34.9,"precoCDL":15.0},{"sku":32591,"nome":"O caminho para Belém","precoCapa":34.9,"precoCDL":15.0},{"sku":32684,"nome":"Esqueceram do Natal","precoCapa":34.9,"precoCDL":15.0},{"sku":33455,"nome":"A Bela e a Fera","precoCapa":34.9,"precoCDL":15.0},{"sku":33952,"nome":"O esquilo de Sofia","precoCapa":34.9,"precoCDL":15.0},{"sku":28701,"nome":"A boneca de cera","precoCapa":34.9,"precoCDL":15.0},{"sku":31756,"nome":"Sofia e os lobos","precoCapa":34.9,"precoCDL":15.0},{"sku":27130,"nome":"O Rouxinol e a Rosa","precoCapa":34.9,"precoCDL":15.0},{"sku":35591,"nome":"A princesa flutuante","precoCapa":32.5,"precoCDL":10.0},{"sku":31026,"nome":"O dragão do meu pai","precoCapa":32.5,"precoCDL":10.0},{"sku":36698,"nome":"Tom Chist e o baú de tesouro","precoCapa":32.5,"precoCDL":10.0},{"sku":33248,"nome":"Os dragões de Terrazul","precoCapa":32.5,"precoCDL":10.0},{"sku":36583,"nome":"Ana de pano, vol. 2: Ana de pano ao resgate!","precoCapa":34.9,"precoCDL":15.0},{"sku":28400,"nome":"O nome das coisas: Tá na mesa!","precoCapa":26.9,"precoCDL":10.0},{"sku":28777,"nome":"O nome das coisas: Compras na feira","precoCapa":26.9,"precoCDL":10.0},{"sku":34532,"nome":"Onde está o esquilo?","precoCapa":26.9,"precoCDL":10.0},{"sku":27131,"nome":"Meu primeiro livro de cachorros","precoCapa":26.9,"precoCDL":10.0},{"sku":32267,"nome":"Eu só queria dormir!","precoCapa":26.9,"precoCDL":10.0},{"sku":34165,"nome":"Como é bom aprender: Números","precoCapa":26.9,"precoCDL":10.0},{"sku":35269,"nome":"Opostos: Aniversário de urso","precoCapa":26.9,"precoCDL":10.0},{"sku":35524,"nome":"O nome das coisas: Parquinho","precoCapa":26.9,"precoCDL":10.0},{"sku":35611,"nome":"A cigarra e as formigas","precoCapa":26.9,"precoCDL":10.0},{"sku":35686,"nome":"Os escavadores","precoCapa":26.9,"precoCDL":10.0},{"sku":35975,"nome":"Onde está? Especial de Natal","precoCapa":26.9,"precoCDL":10.0},{"sku":36979,"nome":"Como é bom aprender: cores","precoCapa":26.9,"precoCDL":10.0},{"sku":29032,"nome":"O nome das coisas: Hora do banho","precoCapa":26.9,"precoCDL":10.0},{"sku":29792,"nome":"O nome das coisas: É Natal","precoCapa":26.9,"precoCDL":10.0},{"sku":30490,"nome":"O nome das coisas: Hora de dormir","precoCapa":26.9,"precoCDL":10.0},{"sku":30505,"nome":"O nome das coisas: Passeio no Zoológico","precoCapa":26.9,"precoCDL":10.0},{"sku":31199,"nome":"Meu primeiro livro de esportes","precoCapa":26.9,"precoCDL":10.0},{"sku":32438,"nome":"Onde está Roseta?","precoCapa":26.9,"precoCDL":10.0},{"sku":32578,"nome":"Opostos: vida de urso","precoCapa":26.9,"precoCDL":10.0},{"sku":32628,"nome":"O melhor presente de Natal","precoCapa":26.9,"precoCDL":10.0},{"sku":33755,"nome":"Tesouro poético da infância: Trava língua","precoCapa":26.9,"precoCDL":10.0},{"sku":35055,"nome":"Tesouro poético da infância: Lengalengas","precoCapa":26.9,"precoCDL":10.0},{"sku":34707,"nome":"O nome das coisas: Vamos ao circo","precoCapa":26.9,"precoCDL":10.0},{"sku":35049,"nome":"Meu primeiro livro de profissões","precoCapa":26.9,"precoCDL":10.0},{"sku":35052,"nome":"A festa do rei urso","precoCapa":26.9,"precoCDL":10.0},{"sku":28700,"nome":"O nome das coisas: Passeio na fazenda","precoCapa":26.9,"precoCDL":10.0},{"sku":30782,"nome":"Meu primeiro livro de meios de transporte","precoCapa":26.9,"precoCDL":10.0},{"sku":33451,"nome":"O nome das coisas: Vamos à praia!","precoCapa":26.9,"precoCDL":10.0},{"sku":33582,"nome":"Meu primeiro livro de música","precoCapa":26.9,"precoCDL":10.0},{"sku":36672,"nome":"Meu primeiro livro de astronomia","precoCapa":26.9,"precoCDL":10.0},{"sku":30680,"nome":"Onde está Mimi?","precoCapa":26.9,"precoCDL":10.0},{"sku":31730,"nome":"O nome das coisas: Futebol","precoCapa":26.9,"precoCDL":10.0},{"sku":33188,"nome":"Onde está Totó?","precoCapa":26.9,"precoCDL":10.0},{"sku":33332,"nome":"A tartaruga e a lebre","precoCapa":26.9,"precoCDL":10.0},{"sku":29788,"nome":"A história de São Nicolau","precoCapa":34.9,"precoCDL":15.0},{"sku":30069,"nome":"A estrela, um sonho de infância","precoCapa":34.9,"precoCDL":15.0},{"sku":30070,"nome":"As aventuras de Caramelo: A chegada da corte portuguesa ao Brasil - vol. II","precoCapa":37.9,"precoCDL":15.0},{"sku":30586,"nome":"A roupa nova do imperador","precoCapa":37.9,"precoCDL":15.0},{"sku":30851,"nome":"A porta aberta","precoCapa":34.9,"precoCDL":15.0},{"sku":31030,"nome":"Cadê o grito?","precoCapa":42.5,"precoCDL":15.0},{"sku":31046,"nome":"Aventuras de Tom Sawyer","precoCapa":64.9,"precoCDL":20.0},{"sku":31181,"nome":"Alice no País das Maravilhas","precoCapa":75.9,"precoCDL":20.0},{"sku":31375,"nome":"A princesa e o goblin","precoCapa":49.9,"precoCDL":20.0},{"sku":31522,"nome":"As aventuras de Caramelo: Olimpíada na Grécia Antiga - vol. III","precoCapa":37.9,"precoCDL":15.0},{"sku":31645,"nome":"Cinderela","precoCapa":37.9,"precoCDL":15.0},{"sku":31841,"nome":"Meu primeiro livro de gatos","precoCapa":26.9,"precoCDL":10.0},{"sku":31925,"nome":"Elmer e o dragão","precoCapa":32.5,"precoCDL":10.0},{"sku":32047,"nome":"Chapeuzinho Vermelho","precoCapa":37.9,"precoCDL":15.0}];
+const LIVROS = [{"sku":28702,"nome":"Pinóquio","isbn":"9786585310123","precoCapa":89.9,"precoCDL":25.0},{"sku":33480,"nome":"Poliana","isbn":"9786585310673","precoCapa":89.9,"precoCDL":20.0},{"sku":34818,"nome":"Rebeca do vale do sol","isbn":"9786585310864","precoCapa":94.9,"precoCDL":25.0},{"sku":33399,"nome":"Cinco crianças e um segredo","isbn":"9786585310628","precoCapa":89.9,"precoCDL":20.0},{"sku":34080,"nome":"A princesa e Curdie","isbn":"9786585310697","precoCapa":86.9,"precoCDL":20.0},{"sku":30523,"nome":"O Mágico de Oz","isbn":"9786585310260","precoCapa":74.9,"precoCDL":25.0},{"sku":32219,"nome":"O vento nos salgueiros","isbn":"9786585310468","precoCapa":79.9,"precoCDL":20.0},{"sku":35047,"nome":"Rei Artur e os cavaleiros da távola redonda","isbn":"9786585310888","precoCapa":69.9,"precoCDL":20.0},{"sku":35976,"nome":"A história de um quebra-nozes e outros contos de natal","isbn":null,"precoCapa":59.9,"precoCDL":20.0},{"sku":35305,"nome":"Caninos brancos","isbn":"9786585310956","precoCapa":54.9,"precoCDL":20.0},{"sku":31456,"nome":"Moby Dick","isbn":"9786585310345","precoCapa":69.9,"precoCDL":25.0},{"sku":35731,"nome":"Bambi: uma história de vida na floresta","isbn":null,"precoCapa":75.9,"precoCDL":20.0},{"sku":29322,"nome":"Poesias infantis","isbn":"9786585310147","precoCapa":69.9,"precoCDL":20.0},{"sku":35317,"nome":"A estrela azul","isbn":"9786585310994","precoCapa":75.9,"precoCDL":20.0},{"sku":34650,"nome":"Otto da mão de prata","isbn":"9786585310789","precoCapa":61.2,"precoCDL":20.0},{"sku":29100,"nome":"O lago secreto","isbn":"9786585310130","precoCapa":59.9,"precoCDL":20.0},{"sku":30413,"nome":"Uma cantiga de Natal","isbn":null,"precoCapa":44.9,"precoCDL":15.0},{"sku":33775,"nome":"Travando línguas travessas","isbn":null,"precoCapa":49.9,"precoCDL":20.0},{"sku":34732,"nome":"O café da manhã da família 14","isbn":"9786585310710","precoCapa":37.9,"precoCDL":15.0},{"sku":32186,"nome":"Rikki-Tikki-Tavi","isbn":"9786585310437","precoCapa":42.5,"precoCDL":15.0},{"sku":28749,"nome":"Os Coloridos da Fada Tarsila","isbn":"9786585310116","precoCapa":42.5,"precoCDL":15.0},{"sku":33936,"nome":"O chamado da floresta","isbn":"9786585310734","precoCapa":38.9,"precoCDL":15.0},{"sku":36582,"nome":"Cedrico, o pequeno cavaleiro","isbn":null,"precoCapa":39.9,"precoCDL":15.0},{"sku":28571,"nome":"As aventuras de Caramelo: O descobrimento do Brasil - vol. I","isbn":"9786585310055","precoCapa":37.9,"precoCDL":15.0},{"sku":28662,"nome":"Branca de Neve","isbn":"9786585310109","precoCapa":37.9,"precoCDL":15.0},{"sku":36615,"nome":"A história de Keesh","isbn":null,"precoCapa":37.9,"precoCDL":15.0},{"sku":36673,"nome":"A Ilha dos Nove Redemoinhos","isbn":null,"precoCapa":37.9,"precoCDL":15.0},{"sku":28087,"nome":"A história de Pedro Coelho","isbn":"9786585310024","precoCapa":37.9,"precoCDL":15.0},{"sku":28226,"nome":"A bruxa e o poeta","isbn":"9786585310031","precoCapa":42.5,"precoCDL":15.0},{"sku":34314,"nome":"As aventuras de Caramelo: Saci e o Lobisomem, vol. V","isbn":"9786585310819","precoCapa":37.9,"precoCDL":15.0},{"sku":34746,"nome":"O brilhante Roberto","isbn":"9786585310840","precoCapa":37.9,"precoCDL":15.0},{"sku":35230,"nome":"A história da pequena sereia","isbn":"9786585310901","precoCapa":37.9,"precoCDL":15.0},{"sku":35576,"nome":"O livro das feras","isbn":null,"precoCapa":37.9,"precoCDL":15.0},{"sku":32401,"nome":"João e o pé de feijão","isbn":"9786585310499","precoCapa":37.9,"precoCDL":15.0},{"sku":35878,"nome":"A noite de natal","isbn":null,"precoCapa":37.9,"precoCDL":15.0},{"sku":35879,"nome":"As aventuras de Caramelo: o vira-lata que salvou o Natal, Vol. vII","isbn":null,"precoCapa":39.9,"precoCDL":15.0},{"sku":35973,"nome":"O pinheirinho","isbn":null,"precoCapa":34.9,"precoCDL":15.0},{"sku":36511,"nome":"O melhor irmão do mundo / A melhor irmã do mundo","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":36675,"nome":"O chá de Sofia","isbn":null,"precoCapa":34.9,"precoCDL":15.0},{"sku":34420,"nome":"O nabo gigante","isbn":"9786585310796","precoCapa":37.5,"precoCDL":15.0},{"sku":35616,"nome":"As aventuras de Caramelo: Supermelo, o herói de patas - vol. VI","isbn":"9786585310895","precoCapa":37.5,"precoCDL":15.0},{"sku":35736,"nome":"Onde existe amor, Deus aí está","isbn":null,"precoCapa":37.9,"precoCDL":15.0},{"sku":32487,"nome":"A Rainha da Neve","isbn":"9786585310505","precoCapa":37.9,"precoCDL":15.0},{"sku":30886,"nome":"Rapunzel","isbn":"9786585310307","precoCapa":37.9,"precoCDL":15.0},{"sku":31263,"nome":"O príncipe feliz","isbn":"9786585310376","precoCapa":37.9,"precoCDL":15.0},{"sku":33473,"nome":"Os três porquinhos","isbn":"9786585310598","precoCapa":37.9,"precoCDL":15.0},{"sku":32557,"nome":"As aventuras de Caramelo: Aladim e a lâmpada mágica - vol. IV","isbn":"9786585310536","precoCapa":37.9,"precoCDL":15.0},{"sku":33758,"nome":"O amigo dedicado","isbn":"9786585310642","precoCapa":37.9,"precoCDL":15.0},{"sku":34941,"nome":"Histórias de Foxwood - A regata de Foxwood","isbn":"9786585310802","precoCapa":39.9,"precoCDL":15.0},{"sku":35624,"nome":"Histórias de Foxwood - O tesouro de Foxwood","isbn":null,"precoCapa":39.9,"precoCDL":15.0},{"sku":35752,"nome":"Histórias de Foxwood - A surpresa de Foxwood","isbn":null,"precoCapa":39.9,"precoCDL":15.0},{"sku":36699,"nome":"Histórias de Foxwood - Os contrabandistas de Foxwood","isbn":null,"precoCapa":39.9,"precoCDL":15.0},{"sku":36578,"nome":"A viagem de Lili ao redor do mundo","isbn":null,"precoCapa":37.9,"precoCDL":15.0},{"sku":34209,"nome":"Histórias de Foxwood - Roubo em Foxwood","isbn":"9786585310741","precoCapa":39.9,"precoCDL":15.0},{"sku":29813,"nome":"O Gigante Egoísta","isbn":"9786585310178","precoCapa":34.9,"precoCDL":15.0},{"sku":32683,"nome":"A história do esquilo Joselito","isbn":"9786585310574","precoCapa":34.9,"precoCDL":15.0},{"sku":35315,"nome":"A última história do Vovô","isbn":"9786585310987","precoCapa":34.9,"precoCDL":15.0},{"sku":34212,"nome":"O filhote de elefante","isbn":"9786585310772","precoCapa":34.9,"precoCDL":15.0},{"sku":35051,"nome":"Ana de pano aprende uma lição","isbn":"9786585310857","precoCapa":34.9,"precoCDL":15.0},{"sku":35687,"nome":"A origem dos tatus","isbn":null,"precoCapa":34.9,"precoCDL":15.0},{"sku":32682,"nome":"Um Natal Feliz","isbn":null,"precoCapa":34.9,"precoCDL":15.0},{"sku":32591,"nome":"O caminho para Belém","isbn":"9786585310529","precoCapa":34.9,"precoCDL":15.0},{"sku":32684,"nome":"Esqueceram do Natal","isbn":null,"precoCapa":34.9,"precoCDL":15.0},{"sku":33455,"nome":"A Bela e a Fera","isbn":"9786585310666","precoCapa":34.9,"precoCDL":15.0},{"sku":33952,"nome":"O esquilo de Sofia","isbn":"9786585310727","precoCapa":34.9,"precoCDL":15.0},{"sku":28701,"nome":"A boneca de cera","isbn":"9786585310093","precoCapa":34.9,"precoCDL":15.0},{"sku":31756,"nome":"Sofia e os lobos","isbn":"9786585310413","precoCapa":34.9,"precoCDL":15.0},{"sku":27130,"nome":"O Rouxinol e a Rosa","isbn":"9786585310000","precoCapa":34.9,"precoCDL":15.0},{"sku":35591,"nome":"A princesa flutuante","isbn":null,"precoCapa":32.5,"precoCDL":10.0},{"sku":31026,"nome":"O dragão do meu pai","isbn":"9786585310352","precoCapa":32.5,"precoCDL":10.0},{"sku":36698,"nome":"Tom Chist e o baú de tesouro","isbn":null,"precoCapa":32.5,"precoCDL":10.0},{"sku":33248,"nome":"Os dragões de Terrazul","isbn":"9786585310581","precoCapa":32.5,"precoCDL":10.0},{"sku":36583,"nome":"Ana de pano, vol. 2: Ana de pano ao resgate!","isbn":null,"precoCapa":34.9,"precoCDL":15.0},{"sku":28400,"nome":"O nome das coisas: Tá na mesa!","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":28777,"nome":"O nome das coisas: Compras na feira","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":34532,"nome":"Onde está o esquilo?","isbn":"9786585310833","precoCapa":26.9,"precoCDL":10.0},{"sku":27131,"nome":"Meu primeiro livro de cachorros","isbn":"9786585310017","precoCapa":26.9,"precoCDL":10.0},{"sku":32267,"nome":"Eu só queria dormir!","isbn":"9786585310482","precoCapa":26.9,"precoCDL":10.0},{"sku":34165,"nome":"Como é bom aprender: Números","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":35269,"nome":"Opostos: Aniversário de urso","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":35524,"nome":"O nome das coisas: Parquinho","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":35611,"nome":"A cigarra e as formigas","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":35686,"nome":"Os escavadores","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":35975,"nome":"Onde está? Especial de Natal","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":36979,"nome":"Como é bom aprender: cores","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":29032,"nome":"O nome das coisas: Hora do banho","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":29792,"nome":"O nome das coisas: É Natal","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":30490,"nome":"O nome das coisas: Hora de dormir","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":30505,"nome":"O nome das coisas: Passeio no Zoológico","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":31199,"nome":"Meu primeiro livro de esportes","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":32438,"nome":"Onde está Roseta?","isbn":"9786585310475","precoCapa":26.9,"precoCDL":10.0},{"sku":32578,"nome":"Opostos: vida de urso","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":32628,"nome":"O melhor presente de Natal","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":33755,"nome":"Tesouro poético da infância: Trava língua","isbn":"9786585310680","precoCapa":26.9,"precoCDL":10.0},{"sku":35055,"nome":"Tesouro poético da infância: Lengalengas","isbn":"9786585310949","precoCapa":26.9,"precoCDL":10.0},{"sku":34707,"nome":"O nome das coisas: Vamos ao circo","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":35049,"nome":"Meu primeiro livro de profissões","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":35052,"nome":"A festa do rei urso","isbn":"9786585310918","precoCapa":26.9,"precoCDL":10.0},{"sku":28700,"nome":"O nome das coisas: Passeio na fazenda","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":30782,"nome":"Meu primeiro livro de meios de transporte","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":33451,"nome":"O nome das coisas: Vamos à praia!","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":33582,"nome":"Meu primeiro livro de música","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":36672,"nome":"Meu primeiro livro de astronomia","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":30680,"nome":"Onde está Mimi?","isbn":"9786585310222","precoCapa":26.9,"precoCDL":10.0},{"sku":31730,"nome":"O nome das coisas: Futebol","isbn":null,"precoCapa":26.9,"precoCDL":10.0},{"sku":33188,"nome":"Onde está Totó?","isbn":"9786585310611","precoCapa":26.9,"precoCDL":10.0},{"sku":33332,"nome":"A tartaruga e a lebre","isbn":"9786585310635","precoCapa":26.9,"precoCDL":10.0},{"sku":29788,"nome":"A história de São Nicolau","isbn":"9786585310154","precoCapa":34.9,"precoCDL":15.0},{"sku":30069,"nome":"A estrela, um sonho de infância","isbn":"9786585310192","precoCapa":34.9,"precoCDL":15.0},{"sku":30070,"nome":"As aventuras de Caramelo: A chegada da corte portuguesa ao Brasil - vol. II","isbn":"9786585310185","precoCapa":37.9,"precoCDL":15.0},{"sku":30586,"nome":"A roupa nova do imperador","isbn":"9786585310253","precoCapa":37.9,"precoCDL":15.0},{"sku":30851,"nome":"A porta aberta","isbn":"9786585310284","precoCapa":34.9,"precoCDL":15.0},{"sku":31030,"nome":"Cadê o grito?","isbn":"9786585310321","precoCapa":42.5,"precoCDL":15.0},{"sku":31046,"nome":"Aventuras de Tom Sawyer","isbn":"9786585310277","precoCapa":64.9,"precoCDL":20.0},{"sku":31181,"nome":"Alice no País das Maravilhas","isbn":"9786585310338","precoCapa":75.9,"precoCDL":20.0},{"sku":31375,"nome":"A princesa e o goblin","isbn":"9786585310383","precoCapa":49.9,"precoCDL":20.0},{"sku":31522,"nome":"As aventuras de Caramelo: Olimpíada na Grécia Antiga - vol. III","isbn":"9786585310406","precoCapa":37.9,"precoCDL":15.0},{"sku":31645,"nome":"Cinderela","isbn":"9786585310390","precoCapa":37.9,"precoCDL":15.0},{"sku":31841,"nome":"Meu primeiro livro de gatos","isbn":"9786585310420","precoCapa":26.9,"precoCDL":10.0},{"sku":31925,"nome":"Elmer e o dragão","isbn":"9786585310444","precoCapa":32.5,"precoCDL":10.0},{"sku":32047,"nome":"Chapeuzinho Vermelho","isbn":"9786585310451","precoCapa":37.9,"precoCDL":15.0}];
+
+// Índice ISBN -> livro para busca rápida
+const ISBN_INDEX = {};
+LIVROS.forEach(l => { if(l.isbn) ISBN_INDEX[l.isbn] = l; });
 
 // ═══════════════════════════════════════════════════
 //  SUPABASE
@@ -876,6 +954,7 @@ function showSection(id, btn) {
   if(id==='historico') renderHistorico();
   if(id==='alertas') renderAlertas();
   if(id==='inicial') renderInicial();
+  if(id==='scanner') { atualizarColégiosSugeridos(''); setTimeout(()=>document.getElementById('scanner-input')?.focus(),100); }
 }
 
 // ═══════════════════════════════════════════════════
@@ -889,6 +968,184 @@ function showToast(msg,type=''){
   t.textContent=msg; t.className='show'+(type?' '+type:'');
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>{t.className='';},3400);
+}
+
+// ═══════════════════════════════════════════════════
+//  VENDA RÁPIDA — SCANNER
+// ═══════════════════════════════════════════════════
+let scannerLivro = null;
+let sessionVendas = [];
+let scannerTimer = null;
+
+// Leitores de código de barras digitam rápido + Enter
+// Detectamos pelo tempo entre teclas (< 50ms = scanner)
+let scanBuffer = '';
+let lastKeyTime = 0;
+
+function onScannerKey(e) {
+  const now = Date.now();
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const isbn = document.getElementById('scanner-input').value.trim();
+    if (isbn.length >= 8) processarISBN(isbn);
+    return;
+  }
+  // Acumula buffer para detectar leitura rápida do scanner
+  if (now - lastKeyTime < 80) {
+    scanBuffer += e.key;
+  } else {
+    scanBuffer = e.key;
+  }
+  lastKeyTime = now;
+}
+
+function onScannerInput() {
+  clearTimeout(scannerTimer);
+  const val = document.getElementById('scanner-input').value.trim();
+  // Se chegou código com 13 dígitos (ISBN-13) processa automaticamente
+  if (val.length >= 13) {
+    scannerTimer = setTimeout(() => processarISBN(val), 120);
+  }
+}
+
+function processarISBN(isbn) {
+  // Limpar espaços e caracteres indesejados
+  isbn = isbn.replace(/\D/g, '');
+  const livro = ISBN_INDEX[isbn];
+  const preview = document.getElementById('scanner-preview');
+  const form = document.getElementById('scanner-form');
+
+  if (!livro) {
+    preview.className = 'preview-box';
+    preview.style.borderColor = 'var(--red)';
+    preview.style.background = 'var(--red-light)';
+    preview.innerHTML = `<div style="color:var(--red);font-weight:600">❌ ISBN não encontrado: ${isbn}</div><div style="font-size:.78rem;color:var(--muted);margin-top:4px">Verifique se o livro está cadastrado no sistema</div>`;
+    form.style.display = 'none';
+    scannerLivro = null;
+    return;
+  }
+
+  const e = estoque[livro.sku] || 0;
+  if (e === 0) {
+    preview.className = 'preview-box';
+    preview.style.borderColor = 'var(--red)';
+    preview.style.background = 'var(--red-light)';
+    preview.innerHTML = `<div style="color:var(--red);font-weight:600">⚠ Estoque zerado!</div><div style="font-weight:600;margin-top:4px">${livro.nome}</div><div style="font-size:.78rem;color:var(--muted)">Não há unidades disponíveis para venda</div>`;
+    form.style.display = 'none';
+    scannerLivro = null;
+    return;
+  }
+
+  // Livro encontrado com estoque!
+  scannerLivro = livro;
+  const cls = e <= 3 ? 'estoque-baixo' : 'estoque-ok';
+  preview.className = 'preview-box filled';
+  preview.style.borderColor = 'var(--green)';
+  preview.style.background = 'var(--green-light)';
+  preview.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="font-size:1.2rem">✅</span>
+      <span class="preview-nome" style="font-size:1rem">${livro.nome}</span>
+    </div>
+    <div class="preview-info">ISBN: ${isbn} · SKU: ${livro.sku}</div>
+    <div style="display:flex;gap:16px;margin-top:8px">
+      <div><span style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Preço CDL</span><br><span style="font-weight:700;color:var(--green);font-size:1.1rem">R$ ${livro.precoCDL.toFixed(2).replace('.',',')}</span></div>
+      <div><span style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Estoque</span><br><span class="${cls}" style="font-weight:700;font-size:1.1rem">${e} un.</span></div>
+    </div>`;
+
+  document.getElementById('scanner-qtd').max = e;
+  document.getElementById('scanner-qtd').value = 1;
+  document.getElementById('scanner-data').value = new Date().toISOString().split('T')[0];
+  form.style.display = 'block';
+
+  // Foco na quantidade para agilizar
+  setTimeout(() => document.getElementById('scanner-qtd').focus(), 50);
+}
+
+async function confirmarVendaScanner() {
+  if (!scannerLivro) return;
+  const qtd = parseInt(document.getElementById('scanner-qtd').value) || 1;
+  const data = document.getElementById('scanner-data').value;
+  const colegio = document.getElementById('scanner-colegio').value.trim();
+  const e = estoque[scannerLivro.sku] || 0;
+
+  if (!colegio) { showToast('Informe o colégio/turma!', 'error'); document.getElementById('scanner-colegio').focus(); return; }
+  if (qtd > e) { showToast(`Estoque insuficiente! Disponível: ${e} un.`, 'error'); return; }
+
+  const btn = document.getElementById('scanner-btn-confirmar');
+  btn.disabled = true; btn.textContent = '⏳ Salvando...';
+
+  try {
+    const novoQtd = e - qtd;
+    await upsertEstoque(scannerLivro.sku, novoQtd);
+    await inserirHistorico({ tipo: 'saida', sku: scannerLivro.sku, nome: scannerLivro.nome, qtd, data, obs: '', colegio });
+
+    // Adicionar à sessão
+    sessionVendas.unshift({ livro: scannerLivro, qtd, colegio, data });
+    atualizarColégiosSugeridos(colegio);
+    renderSessionVendas();
+    updateStats(); renderEstoque(); renderAlertas();
+
+    showToast(`✓ ${qtd}× "${scannerLivro.nome}" vendido(s)!`, 'success');
+    limparScanner();
+  } catch(err) {
+    showToast('Erro ao salvar. Tente novamente.', 'error');
+  }
+  btn.disabled = false; btn.textContent = '✔ Confirmar Venda';
+}
+
+function limparScanner() {
+  scannerLivro = null;
+  document.getElementById('scanner-input').value = '';
+  document.getElementById('scanner-form').style.display = 'none';
+  const preview = document.getElementById('scanner-preview');
+  preview.className = 'preview-box';
+  preview.style.borderColor = '';
+  preview.style.background = '';
+  preview.innerHTML = '<span>Aguardando leitura do código de barras...</span>';
+  // Devolver foco ao campo de leitura
+  setTimeout(() => document.getElementById('scanner-input').focus(), 50);
+}
+
+function renderSessionVendas() {
+  const el = document.getElementById('scanner-session-list');
+  const totalEl = document.getElementById('scanner-session-total');
+
+  if (!sessionVendas.length) {
+    el.innerHTML = `<div class="empty-state" style="padding:24px"><div class="emoji">🛒</div><p>Nenhuma venda ainda</p></div>`;
+    totalEl.style.display = 'none';
+    return;
+  }
+
+  el.innerHTML = sessionVendas.map((v, i) => `
+    <div style="background:var(--cream);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.83rem;color:var(--navy)">${v.livro.nome}</div>
+        <div style="font-size:.73rem;color:var(--muted)">🏫 ${v.colegio}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-weight:700;color:var(--red);font-size:.9rem">−${v.qtd}</div>
+        <div style="font-size:.73rem;color:var(--green);font-weight:600">R$ ${(v.livro.precoCDL * v.qtd).toFixed(2).replace('.',',')}</div>
+      </div>
+    </div>`).join('');
+
+  const totalQtd = sessionVendas.reduce((s, v) => s + v.qtd, 0);
+  const totalVal = sessionVendas.reduce((s, v) => s + v.livro.precoCDL * v.qtd, 0);
+  document.getElementById('scanner-total-valor').textContent = `R$ ${totalVal.toFixed(2).replace('.', ',')}`;
+  document.getElementById('scanner-total-livros').textContent = `${totalQtd} livro(s) vendido(s)`;
+  totalEl.style.display = 'block';
+}
+
+// Sugestões de colégios já usados
+let colegiosUsados = JSON.parse(localStorage.getItem('cdl_colegios') || '[]');
+function atualizarColégiosSugeridos(colegio) {
+  if (colegio && !colegiosUsados.includes(colegio)) {
+    colegiosUsados.unshift(colegio);
+    colegiosUsados = colegiosUsados.slice(0, 20);
+    localStorage.setItem('cdl_colegios', JSON.stringify(colegiosUsados));
+  }
+  const dl = document.getElementById('colegios-list');
+  if (dl) dl.innerHTML = colegiosUsados.map(c => `<option value="${c}">`).join('');
 }
 
 // ═══════════════════════════════════════════════════
