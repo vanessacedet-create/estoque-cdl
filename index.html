@@ -1071,6 +1071,7 @@ function renderEstoque() {
       <td>
         <button class="btn-action entrada" onclick="quickMove(${l.sku},'entrada')">+</button>
         <button class="btn-action venda" onclick="quickMove(${l.sku},'saida')">−</button>
+        <button class="btn-action" onclick="editarPreco(${l.sku})" style="background:var(--cream2);color:var(--navy);border:1px solid var(--border)" title="Editar preço CDL">✏</button>
       </td></tr>`;
   }).join('');
 }
@@ -1108,6 +1109,49 @@ async function confirmQuickMove() {
     showToast(tipo==='entrada'?`+${qtd} unidade(s) adicionada(s) ✓`:`−${qtd} vendida(s) ✓`,'success');
   } catch(err) { showToast('Erro ao salvar. Tente novamente.','error'); await carregarEstoque(); renderEstoque(); }
 }
+
+function editarPreco(sku) {
+  const livro = todosProdutos().find(l => l.sku === sku);
+  if (!livro) return;
+  document.getElementById('modal-title').textContent = 'Editar Preço CDL';
+  document.getElementById('modal-body').textContent = livro.nome;
+  document.getElementById('modal-extra').innerHTML = `
+    <div class="form-group" style="margin-bottom:0">
+      <label>Novo Preço CDL (R$)</label>
+      <input type="number" id="modal-novo-preco" min="0" step="0.01"
+        value="${livro.precoCDL.toFixed(2)}"
+        style="margin-top:6px;font-size:1.1rem;font-weight:700;text-align:center">
+    </div>`;
+  const btn = document.getElementById('modal-confirm');
+  btn.className = 'btn-primary';
+  btn.textContent = 'Salvar Preço';
+  btn.onclick = () => confirmarEdicaoPreco(sku);
+  document.getElementById('modal').classList.add('open');
+  setTimeout(() => document.getElementById('modal-novo-preco').select(), 100);
+}
+
+function confirmarEdicaoPreco(sku) {
+  const novoPreco = parseFloat(document.getElementById('modal-novo-preco').value);
+  if (!novoPreco || novoPreco <= 0) { showToast('Preço inválido!', 'error'); return; }
+
+  // Atualizar no array correto (LIVROS base ou LIVROS_EXTRA)
+  const livroBase = LIVROS.find(l => l.sku === sku);
+  if (livroBase) {
+    livroBase.precoCDL = novoPreco;
+  } else {
+    const livroExtra = LIVROS_EXTRA.find(l => l.sku === sku);
+    if (livroExtra) {
+      livroExtra.precoCDL = novoPreco;
+      salvarExtra();
+    }
+  }
+
+  closeModal();
+  renderEstoque();
+  populateSelects();
+  showToast(`Preço atualizado para R$ ${novoPreco.toFixed(2).replace('.',',')} ✓`, 'success');
+}
+
 
 // ═══════════════════════════════════════════════════
 //  FORMULÁRIO MOVIMENTOS
