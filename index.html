@@ -1010,8 +1010,7 @@ async function iniciar() {
   } catch(e) {
     document.getElementById('loading-screen').classList.remove('open');
     setConnStatus(false);
-    showToast('Erro ao conectar. Verifique a URL e a chave.', 'error');
-    document.getElementById('setup-screen').classList.add('open');
+    throw e; // propagar o erro para o catch da inicialização
   }
 }
 
@@ -2300,7 +2299,10 @@ if(savedToken){
   SB_TOKEN = savedToken;
   if(savedEmail) document.getElementById('header-usuario').textContent = savedEmail.split('@')[0];
   iniciar().catch(()=>{
+    // Token expirado — voltar para login (nunca mostrar setup)
     localStorage.removeItem('cdl_token');
+    localStorage.removeItem('cdl_user_email');
+    SB_TOKEN = '';
     document.getElementById('login-screen').classList.add('open');
   });
 } else {
