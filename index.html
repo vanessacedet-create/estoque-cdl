@@ -828,6 +828,47 @@ CREATE TABLE historico (
     </div>
   </div>
 </div>
+
+<!-- MODAL EDITAR PRODUTO -->
+<div class="modal-overlay" id="modal-editar-produto">
+  <div class="modal" style="max-width:520px">
+    <h3>⚙ Editar Produto</h3>
+    <p id="edit-prod-sku-label" style="font-size:.78rem;color:var(--muted);margin-bottom:16px"></p>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nome *</label>
+        <input type="text" id="edit-prod-nome">
+      </div>
+      <div class="form-group" style="max-width:130px">
+        <label>Tipo</label>
+        <select id="edit-prod-tipo">
+          <option value="Livro">Livro</option>
+          <option value="Revista">Revista</option>
+          <option value="Kit">Kit</option>
+          <option value="Outro">Outro</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>ISBN</label>
+      <input type="text" id="edit-prod-isbn" maxlength="13" placeholder="9786585310123">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Preço de Capa (R$)</label>
+        <input type="number" id="edit-prod-preco-capa" step="0.01" min="0">
+      </div>
+      <div class="form-group">
+        <label>Preço CDL (R$) *</label>
+        <input type="number" id="edit-prod-preco-cdl" step="0.01" min="0">
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="fecharModalEditar()">Cancelar</button>
+      <button class="btn-primary success" onclick="salvarEdicaoProduto()">💾 Salvar Alterações</button>
+    </div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script>
@@ -1072,6 +1113,7 @@ function renderEstoque() {
         <button class="btn-action entrada" onclick="quickMove(${l.sku},'entrada')">+</button>
         <button class="btn-action venda" onclick="quickMove(${l.sku},'saida')">−</button>
         <button class="btn-action" onclick="editarPreco(${l.sku})" style="background:var(--cream2);color:var(--navy);border:1px solid var(--border)" title="Editar preço CDL">✏</button>
+        <button class="btn-action" onclick="editarProduto(${l.sku})" style="background:var(--navy);color:#fff;border:1px solid var(--navy)" title="Editar cadastro">⚙</button>
       </td></tr>`;
   }).join('');
 }
@@ -1108,6 +1150,73 @@ async function confirmQuickMove() {
     renderEstoque(); updateStats(); renderAlertas();
     showToast(tipo==='entrada'?`+${qtd} unidade(s) adicionada(s) ✓`:`−${qtd} vendida(s) ✓`,'success');
   } catch(err) { showToast('Erro ao salvar. Tente novamente.','error'); await carregarEstoque(); renderEstoque(); }
+}
+
+let skuEmEdicao = null;
+
+function editarProduto(sku) {
+  const livro = todosProdutos().find(l => l.sku === sku);
+  if (!livro) return;
+  skuEmEdicao = sku;
+  document.getElementById('edit-prod-sku-label').textContent = `SKU: ${sku}`;
+  document.getElementById('edit-prod-nome').value = livro.nome || '';
+  document.getElementById('edit-prod-tipo').value = livro.tipo || 'Livro';
+  document.getElementById('edit-prod-isbn').value = livro.isbn || '';
+  document.getElementById('edit-prod-preco-capa').value = (livro.precoCapa || 0).toFixed(2);
+  document.getElementById('edit-prod-preco-cdl').value = (livro.precoCDL || 0).toFixed(2);
+  document.getElementById('modal-editar-produto').classList.add('open');
+  setTimeout(() => document.getElementById('edit-prod-nome').focus(), 100);
+}
+
+function fecharModalEditar() {
+  document.getElementById('modal-editar-produto').classList.remove('open');
+  skuEmEdicao = null;
+}
+
+function salvarEdicaoProduto() {
+  if (!skuEmEdicao) return;
+  const nome = document.getElementById('edit-prod-nome').value.trim();
+  const tipo = document.getElementById('edit-prod-tipo').value;
+  const isbn = document.getElementById('edit-prod-isbn').value.replace(/\D/g,'') || null;
+  const precoCapa = parseFloat(document.getElementById('edit-prod-preco-capa').value) || 0;
+  const precoCDL = parseFloat(document.getElementById('edit-prod-preco-cdl').value) || 0;
+
+  if (!nome) { showToast('O nome não pode ficar em branco!', 'error'); return; }
+  if (!precoCDL) { showToast('Informe o Preço CDL!', 'error'); return; }
+
+  // Verificar conflito de ISBN com outro produto
+  if (isbn) {
+    const conflito = todosProdutos().find(l => l.isbn === isbn && l.sku !== skuEmEdicao);
+    if (conflito) { showToast('ISBN já cadastrado em outro produto!', 'error'); return; }
+  }
+
+  // Atualizar no array correto
+  const livroBase = LIVROS.find(l => l.sku === skuEmEdicao);
+  if (livroBase) {
+    livroBase.nome = nome;
+    livroBase.tipo = tipo;
+    livroBase.isbn = isbn;
+    livroBase.precoCapa = precoCapa;
+    livroBase.precoCDL = precoCDL;
+    // Atualizar ISBN_INDEX
+    Object.keys(ISBN_INDEX).forEach(k => { if (ISBN_INDEX[k].sku === skuEmEdicao) delete ISBN_INDEX[k]; });
+    if (isbn) ISBN_INDEX[isbn] = livroBase;
+  } else {
+    const livroExtra = LIVROS_EXTRA.find(l => l.sku === skuEmEdicao);
+    if (livroExtra) {
+      livroExtra.nome = nome;
+      livroExtra.tipo = tipo;
+      livroExtra.isbn = isbn;
+      livroExtra.precoCapa = precoCapa;
+      livroExtra.precoCDL = precoCDL;
+      salvarExtra();
+    }
+  }
+
+  fecharModalEditar();
+  renderEstoque();
+  populateSelects();
+  showToast(`"${nome}" atualizado com sucesso! ✓`, 'success');
 }
 
 function editarPreco(sku) {
