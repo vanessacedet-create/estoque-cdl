@@ -803,7 +803,36 @@ CREATE TABLE historico (
   <!-- ESTOQUE INICIAL -->
   <section class="section" id="sec-inicial">
     <div class="section-title">⚙ Estoque Inicial</div>
-    <div class="section-sub">Informe a quantidade atual de cada livro para começar a usar o sistema. Faça isso uma única vez — depois use os Movimentos para atualizar.</div>
+    <div class="section-sub">Informe a quantidade atual de cada produto. Preencha manualmente ou importe por planilha Excel usando o ISBN.</div>
+
+    <!-- Importar por planilha -->
+    <div class="form-card" style="margin-bottom:24px;border-top:4px solid var(--gold)">
+      <h3>📂 Importar Estoque por Planilha Excel</h3>
+      <p class="form-desc">A planilha deve ter duas colunas: <b>ISBN</b> e <b>Quantidade</b>. O sistema identifica o livro pelo ISBN automaticamente.</p>
+      <div style="background:var(--cream);border-radius:10px;padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:.78rem;font-weight:600;color:var(--navy);margin-bottom:4px">📋 Formato esperado:</div>
+        <div style="font-size:.75rem;color:var(--muted);font-family:monospace;line-height:1.9">
+          ISBN &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| Quantidade<br>
+          9786585310123 | 5<br>
+          9786585310666 | 3
+        </div>
+        <button class="btn-outline" onclick="baixarModeloEstoque()" style="margin-top:10px;font-size:.82rem">⬇ Baixar Modelo (.xlsx)</button>
+      </div>
+      <div class="form-group">
+        <label>Selecionar arquivo .xlsx</label>
+        <input type="file" id="estoque-file" accept=".xlsx,.xls"
+          style="padding:8px;border:1.5px dashed var(--border);border-radius:8px;cursor:pointer;width:100%"
+          onchange="previewEstoquePlanilha(this)">
+      </div>
+      <div id="estoque-import-preview" style="display:none">
+        <div id="estoque-import-info" style="font-size:.82rem;color:var(--muted);margin-bottom:8px"></div>
+        <div id="estoque-import-erros" style="display:none;background:var(--red-light);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:.78rem;color:var(--red)"></div>
+        <div id="estoque-import-list" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;margin-bottom:12px"></div>
+        <button class="btn-primary success" onclick="confirmarEstoquePlanilha()" id="btn-confirmar-estoque-import">✔ Aplicar Estoque</button>
+      </div>
+    </div>
+
+    <!-- Edição manual -->
     <div class="init-toolbar">
       <div class="search-wrap" style="max-width:300px">
         <span class="search-icon">🔍</span>
@@ -2122,6 +2151,114 @@ async function exportarRelatorioXLSX() {
 
 // ═══════════════════════════════════════════════════
 //  AUTO-LOGIN (se já configurado)
+// ═══════════════════════════════════════════════════
+//  IMPORTAR ESTOQUE POR PLANILHA
+// ═══════════════════════════════════════════════════
+let dadosEstoquePlanilha = [];
+
+function baixarModeloEstoque() {
+  const todos = todosProdutos();
+  const header = 'ISBN,Nome,Quantidade';
+  const linhas = todos
+    .filter(l => l.isbn)
+    .map(l => `${l.isbn},"${l.nome}",0`)
+    .join('\n');
+  const csv = header + '\n' + linhas;
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'modelo-estoque-cdl.csv';
+  a.click();
+  showToast('Modelo baixado! Preencha a coluna Quantidade e salve como .xlsx', 'success');
+}
+
+async function previewEstoquePlanilha(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!window.XLSX) await loadSheetJS();
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      const todos = todosProdutos();
+      dadosEstoquePlanilha = [];
+      const naoEncontrados = [];
+
+      rows.forEach(r => {
+        const isbn = String(r['ISBN'] || r['isbn'] || '').replace(/\D/g,'');
+        const qtd = parseInt(r['Quantidade'] || r['quantidade'] || r['Qtd'] || r['qtd'] || 0);
+        if (!isbn) return;
+        const livro = todos.find(l => l.isbn === isbn) || ISBN_INDEX[isbn];
+        if (livro) {
+          dadosEstoquePlanilha.push({ livro, qtd });
+        } else {
+          naoEncontrados.push(isbn);
+        }
+      });
+
+      const preview = document.getElementById('estoque-import-preview');
+      const info = document.getElementById('estoque-import-info');
+      const list = document.getElementById('estoque-import-list');
+      const erros = document.getElementById('estoque-import-erros');
+      preview.style.display = 'block';
+
+      info.textContent = `${dadosEstoquePlanilha.length} produto(s) identificado(s) para atualizar:`;
+
+      if (naoEncontrados.length) {
+        erros.style.display = 'block';
+        erros.innerHTML = `⚠ ${naoEncontrados.length} ISBN(s) não encontrado(s): ${naoEncontrados.join(', ')}`;
+      } else {
+        erros.style.display = 'none';
+      }
+
+      list.innerHTML = dadosEstoquePlanilha.map(({ livro, qtd }) => `
+        <div style="background:var(--cream);padding:7px 12px;border-radius:6px;display:flex;align-items:center;gap:10px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.82rem;font-weight:600;color:var(--navy)">${livro.nome}</div>
+            <div style="font-size:.72rem;color:var(--muted);font-family:monospace">${livro.isbn}</div>
+          </div>
+          <div style="font-family:'Fraunces',serif;font-size:1.1rem;font-weight:700;color:var(--green);flex-shrink:0">${qtd} un.</div>
+        </div>`).join('');
+
+    } catch(err) {
+      showToast('Erro ao ler o arquivo. Verifique o formato.', 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function confirmarEstoquePlanilha() {
+  if (!dadosEstoquePlanilha.length) return;
+  const btn = document.getElementById('btn-confirmar-estoque-import');
+  btn.disabled = true; btn.textContent = '⏳ Salvando...';
+
+  try {
+    const ops = dadosEstoquePlanilha.map(({ livro, qtd }) => ({ sku: livro.sku, quantidade: qtd }));
+    const res = await sbFetch('estoque', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=representation',
+      body: JSON.stringify(ops)
+    });
+    if (!res.ok) throw new Error();
+
+    // Atualizar cache local
+    dadosEstoquePlanilha.forEach(({ livro, qtd }) => estoque[livro.sku] = qtd);
+
+    updateStats(); renderEstoque(); renderInicial(); renderAlertas();
+    document.getElementById('estoque-import-preview').style.display = 'none';
+    document.getElementById('estoque-file').value = '';
+    dadosEstoquePlanilha = [];
+    showToast(`Estoque de ${ops.length} produto(s) atualizado com sucesso! ✓`, 'success');
+  } catch(err) {
+    showToast('Erro ao salvar. Tente novamente.', 'error');
+  }
+  btn.disabled = false; btn.textContent = '✔ Aplicar Estoque';
+}
+
 // ═══════════════════════════════════════════════════
 //  INICIALIZAÇÃO
 // ═══════════════════════════════════════════════════
