@@ -747,7 +747,7 @@ CREATE TABLE historico (
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Preço de Capa (R$) *</label>
+            <label>Preço de Capa (R$)</label>
             <input type="number" id="prod-preco-capa" step="0.01" min="0" placeholder="0,00">
           </div>
           <div class="form-group">
@@ -2158,18 +2158,30 @@ let dadosEstoquePlanilha = [];
 
 function baixarModeloEstoque() {
   const todos = todosProdutos();
-  const header = 'ISBN,Nome,Quantidade';
-  const linhas = todos
-    .filter(l => l.isbn)
-    .map(l => `${l.isbn},"${l.nome}",0`)
-    .join('\n');
-  const csv = header + '\n' + linhas;
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'modelo-estoque-cdl.csv';
-  a.click();
-  showToast('Modelo baixado! Preencha a coluna Quantidade e salve como .xlsx', 'success');
+  // Usar xlsx para gerar arquivo com ISBN formatado como texto
+  if (!window.XLSX) {
+    loadSheetJS().then(() => _gerarModeloEstoque(todos));
+  } else {
+    _gerarModeloEstoque(todos);
+  }
+}
+
+function _gerarModeloEstoque(todos) {
+  const wb = XLSX.utils.book_new();
+  const dados = [['ISBN', 'Nome', 'Quantidade']];
+  todos.filter(l => l.isbn).forEach(l => dados.push([{ v: l.isbn, t: 's' }, l.nome, 0]));
+  
+  const ws = XLSX.utils.aoa_to_sheet(dados);
+  // Forçar coluna ISBN como texto
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let row = 1; row <= range.e.r; row++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: row, c: 0 })];
+    if (cell) cell.t = 's';
+  }
+  ws['!cols'] = [{ wch: 18 }, { wch: 50 }, { wch: 12 }];
+  XLSX.utils.book_append_sheet(wb, ws, 'Estoque');
+  XLSX.writeFile(wb, 'modelo-estoque-cdl.xlsx');
+  showToast('Modelo baixado! Preencha a coluna Quantidade e salve.', 'success');
 }
 
 async function previewEstoquePlanilha(input) {
@@ -2189,12 +2201,29 @@ async function previewEstoquePlanilha(input) {
       const naoEncontrados = [];
 
       rows.forEach(r => {
-        const isbn = String(r['ISBN'] || r['isbn'] || '').replace(/\D/g,'');
+        // ISBN pode vir como número (notação científica do Excel), string com pontos, etc.
+        let isbnRaw = r['ISBN'] || r['isbn'] || r['Isbn'] || '';
+        // Se vier como número (float), converter para inteiro primeiro
+        if (typeof isbnRaw === 'number') isbnRaw = Math.round(isbnRaw).toString();
+        const isbn = String(isbnRaw).replace(/\D/g,'').padStart(0,'0');
+        
         const qtd = parseInt(r['Quantidade'] || r['quantidade'] || r['Qtd'] || r['qtd'] || 0);
-        if (!isbn) return;
-        const livro = todos.find(l => l.isbn === isbn) || ISBN_INDEX[isbn];
+        if (!isbn || isbn.length < 8) return;
+
+        // Buscar por ISBN exato ou por SKU se o ISBN tiver menos dígitos
+        let livro = todos.find(l => l.isbn === isbn) || ISBN_INDEX[isbn];
+        
+        // Tentar também com 13 dígitos completando zeros à esquerda
+        if (!livro && isbn.length < 13) {
+          const isbnPadded = isbn.padStart(13, '0');
+          livro = todos.find(l => l.isbn === isbnPadded) || ISBN_INDEX[isbnPadded];
+        }
+
         if (livro) {
-          dadosEstoquePlanilha.push({ livro, qtd });
+          // Evitar duplicatas
+          if (!dadosEstoquePlanilha.find(d => d.livro.sku === livro.sku)) {
+            dadosEstoquePlanilha.push({ livro, qtd });
+          }
         } else {
           naoEncontrados.push(isbn);
         }
