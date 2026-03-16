@@ -1239,17 +1239,21 @@ async function salvarEdicaoProduto() {
       const l = LIVROS_EXTRA.find(l => l.sku === skuEmEdicao);
       Object.assign(l, { nome, tipo, isbn, precoCapa, precoCDL });
     } else {
-      // Produto base — salvar preço CDL editado na tabela precos_cdl
+      // Produto base — salvar todos os campos editados na tabela precos_cdl
       const res = await sbFetch('precos_cdl', {
         method: 'POST',
         prefer: 'resolution=merge-duplicates,return=representation',
-        body: JSON.stringify({ sku: skuEmEdicao, preco_cdl: precoCDL })
+        body: JSON.stringify({
+          sku: skuEmEdicao,
+          preco_cdl: precoCDL,
+          nome,
+          isbn,
+          tipo,
+          preco_capa: precoCapa
+        })
       });
       if (!res.ok) throw new Error();
-      PRECOS_CDL[skuEmEdicao] = precoCDL;
-      // Atualizar campos locais do livro base também
-      const livroBase = LIVROS.find(l => l.sku === skuEmEdicao);
-      if (livroBase) { livroBase.nome = nome; livroBase.tipo = tipo; livroBase.isbn = isbn; livroBase.precoCapa = precoCapa; }
+      PRECOS_CDL[skuEmEdicao] = { precoCDL, nome, isbn, tipo, precoCapa };
     }
 
     // Rebuild ISBN index
@@ -1290,13 +1294,21 @@ async function confirmarEdicaoPreco(sku) {
   if (!novoPreco || novoPreco <= 0) { showToast('Preço inválido!', 'error'); return; }
 
   try {
+    const existing = PRECOS_CDL[sku] || {};
     const res = await sbFetch('precos_cdl', {
       method: 'POST',
       prefer: 'resolution=merge-duplicates,return=representation',
-      body: JSON.stringify({ sku, preco_cdl: novoPreco })
+      body: JSON.stringify({
+        sku,
+        preco_cdl: novoPreco,
+        nome: existing.nome || null,
+        isbn: existing.isbn || null,
+        tipo: existing.tipo || null,
+        preco_capa: existing.precoCapa || null
+      })
     });
     if (!res.ok) throw new Error();
-    PRECOS_CDL[sku] = novoPreco;
+    PRECOS_CDL[sku] = { ...existing, precoCDL: novoPreco };
     closeModal();
     renderEstoque(); populateSelects();
     showToast(`Preço atualizado para R$ ${novoPreco.toFixed(2).replace('.',',')} ✓`, 'success');
@@ -1771,11 +1783,18 @@ let LIVROS_EXTRA = [];   // produtos cadastrados no Supabase
 let PRECOS_CDL = {};     // preços editados { sku: preco }
 
 function todosProdutos() {
-  // Mescla lista base com extras, aplicando preços editados
-  return [...LIVROS, ...LIVROS_EXTRA].map(l => ({
-    ...l,
-    precoCDL: PRECOS_CDL[l.sku] !== undefined ? PRECOS_CDL[l.sku] : l.precoCDL
-  }));
+  return [...LIVROS, ...LIVROS_EXTRA].map(l => {
+    const override = PRECOS_CDL[l.sku];
+    if (!override) return l;
+    return {
+      ...l,
+      precoCDL: override.precoCDL !== undefined ? override.precoCDL : l.precoCDL,
+      nome: override.nome || l.nome,
+      isbn: override.isbn !== undefined ? override.isbn : l.isbn,
+      tipo: override.tipo || l.tipo,
+      precoCapa: override.precoCapa !== null ? override.precoCapa : l.precoCapa
+    };
+  });
 }
 
 async function carregarProdutosExtra() {
@@ -1793,15 +1812,26 @@ async function carregarProdutosExtra() {
 
 async function carregarPrecosCDL() {
   try {
-    const res = await sbFetch('precos_cdl?select=sku,preco_cdl');
+    const res = await sbFetch('precos_cdl?select=sku,preco_cdl,nome,isbn,tipo,preco_capa');
     if (!res.ok) return;
     const data = await res.json();
     PRECOS_CDL = {};
-    data.forEach(r => PRECOS_CDL[r.sku] = parseFloat(r.preco_cdl));
+    data.forEach(r => {
+      PRECOS_CDL[r.sku] = {
+        precoCDL: parseFloat(r.preco_cdl),
+        nome: r.nome || null,
+        isbn: r.isbn || null,
+        tipo: r.tipo || null,
+        precoCapa: r.preco_capa ? parseFloat(r.preco_capa) : null
+      };
+    });
   } catch(e) {}
 }
 
 function rebuilIsbnIndex() {
+  // Limpar índice atual
+  Object.keys(ISBN_INDEX).forEach(k => delete ISBN_INDEX[k]);
+  // Reconstruir com todos os produtos e suas overrides aplicadas
   todosProdutos().forEach(l => { if(l.isbn) ISBN_INDEX[l.isbn] = l; });
 }
 
