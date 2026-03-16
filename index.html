@@ -965,8 +965,13 @@ async function iniciar() {
   document.getElementById('setup-screen').classList.remove('open');
   document.getElementById('loading-screen').classList.add('open');
   try {
-    await carregarEstoque();
-    await carregarHistorico();
+    await Promise.all([
+      carregarEstoque(),
+      carregarHistorico(),
+      carregarProdutosExtra(),
+      carregarPrecosCDL()
+    ]);
+    rebuilIsbnIndex();
     document.getElementById('loading-screen').classList.remove('open');
     setConnStatus(true);
     populateSelects();
@@ -1173,7 +1178,7 @@ function fecharModalEditar() {
   skuEmEdicao = null;
 }
 
-function salvarEdicaoProduto() {
+async function salvarEdicaoProduto() {
   if (!skuEmEdicao) return;
   const nome = document.getElementById('edit-prod-nome').value.trim();
   const tipo = document.getElementById('edit-prod-tipo').value;
@@ -1184,39 +1189,52 @@ function salvarEdicaoProduto() {
   if (!nome) { showToast('O nome não pode ficar em branco!', 'error'); return; }
   if (!precoCDL) { showToast('Informe o Preço CDL!', 'error'); return; }
 
-  // Verificar conflito de ISBN com outro produto
   if (isbn) {
     const conflito = todosProdutos().find(l => l.isbn === isbn && l.sku !== skuEmEdicao);
     if (conflito) { showToast('ISBN já cadastrado em outro produto!', 'error'); return; }
   }
 
-  // Atualizar no array correto
-  const livroBase = LIVROS.find(l => l.sku === skuEmEdicao);
-  if (livroBase) {
-    livroBase.nome = nome;
-    livroBase.tipo = tipo;
-    livroBase.isbn = isbn;
-    livroBase.precoCapa = precoCapa;
-    livroBase.precoCDL = precoCDL;
-    // Atualizar ISBN_INDEX
-    Object.keys(ISBN_INDEX).forEach(k => { if (ISBN_INDEX[k].sku === skuEmEdicao) delete ISBN_INDEX[k]; });
-    if (isbn) ISBN_INDEX[isbn] = livroBase;
-  } else {
-    const livroExtra = LIVROS_EXTRA.find(l => l.sku === skuEmEdicao);
-    if (livroExtra) {
-      livroExtra.nome = nome;
-      livroExtra.tipo = tipo;
-      livroExtra.isbn = isbn;
-      livroExtra.precoCapa = precoCapa;
-      livroExtra.precoCDL = precoCDL;
-      salvarExtra();
-    }
-  }
+  const btn = document.querySelector('#modal-editar-produto .btn-primary.success');
+  btn.disabled = true; btn.textContent = '⏳ Salvando...';
 
-  fecharModalEditar();
-  renderEstoque();
-  populateSelects();
-  showToast(`"${nome}" atualizado com sucesso! ✓`, 'success');
+  try {
+    const isExtra = LIVROS_EXTRA.find(l => l.sku === skuEmEdicao);
+
+    if (isExtra) {
+      // Produto extra — atualizar tabela produtos_extra
+      const res = await sbFetch('produtos_extra', {
+        method: 'POST',
+        prefer: 'resolution=merge-duplicates,return=representation',
+        body: JSON.stringify({ sku: skuEmEdicao, nome, isbn, tipo, preco_capa: precoCapa, preco_cdl: precoCDL })
+      });
+      if (!res.ok) throw new Error();
+      const l = LIVROS_EXTRA.find(l => l.sku === skuEmEdicao);
+      Object.assign(l, { nome, tipo, isbn, precoCapa, precoCDL });
+    } else {
+      // Produto base — salvar preço CDL editado na tabela precos_cdl
+      const res = await sbFetch('precos_cdl', {
+        method: 'POST',
+        prefer: 'resolution=merge-duplicates,return=representation',
+        body: JSON.stringify({ sku: skuEmEdicao, preco_cdl: precoCDL })
+      });
+      if (!res.ok) throw new Error();
+      PRECOS_CDL[skuEmEdicao] = precoCDL;
+      // Atualizar campos locais do livro base também
+      const livroBase = LIVROS.find(l => l.sku === skuEmEdicao);
+      if (livroBase) { livroBase.nome = nome; livroBase.tipo = tipo; livroBase.isbn = isbn; livroBase.precoCapa = precoCapa; }
+    }
+
+    // Rebuild ISBN index
+    Object.keys(ISBN_INDEX).forEach(k => { if (ISBN_INDEX[k].sku === skuEmEdicao) delete ISBN_INDEX[k]; });
+    if (isbn) ISBN_INDEX[isbn] = todosProdutos().find(l => l.sku === skuEmEdicao);
+
+    fecharModalEditar();
+    renderEstoque(); populateSelects();
+    showToast(`"${nome}" atualizado com sucesso! ✓`, 'success');
+  } catch(e) {
+    showToast('Erro ao salvar. Tente novamente.', 'error');
+  }
+  btn.disabled = false; btn.textContent = '💾 Salvar Alterações';
 }
 
 function editarPreco(sku) {
@@ -1239,26 +1257,24 @@ function editarPreco(sku) {
   setTimeout(() => document.getElementById('modal-novo-preco').select(), 100);
 }
 
-function confirmarEdicaoPreco(sku) {
+async function confirmarEdicaoPreco(sku) {
   const novoPreco = parseFloat(document.getElementById('modal-novo-preco').value);
   if (!novoPreco || novoPreco <= 0) { showToast('Preço inválido!', 'error'); return; }
 
-  // Atualizar no array correto (LIVROS base ou LIVROS_EXTRA)
-  const livroBase = LIVROS.find(l => l.sku === sku);
-  if (livroBase) {
-    livroBase.precoCDL = novoPreco;
-  } else {
-    const livroExtra = LIVROS_EXTRA.find(l => l.sku === sku);
-    if (livroExtra) {
-      livroExtra.precoCDL = novoPreco;
-      salvarExtra();
-    }
+  try {
+    const res = await sbFetch('precos_cdl', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=representation',
+      body: JSON.stringify({ sku, preco_cdl: novoPreco })
+    });
+    if (!res.ok) throw new Error();
+    PRECOS_CDL[sku] = novoPreco;
+    closeModal();
+    renderEstoque(); populateSelects();
+    showToast(`Preço atualizado para R$ ${novoPreco.toFixed(2).replace('.',',')} ✓`, 'success');
+  } catch(e) {
+    showToast('Erro ao salvar preço. Tente novamente.', 'error');
   }
-
-  closeModal();
-  renderEstoque();
-  populateSelects();
-  showToast(`Preço atualizado para R$ ${novoPreco.toFixed(2).replace('.',',')} ✓`, 'success');
 }
 
 
@@ -1405,7 +1421,7 @@ function showSection(id, btn) {
     if(!document.getElementById('rel-data-fim').value) document.getElementById('rel-data-fim').value = today;
   }
   if(id==='produtos') {
-    salvarExtra(); // rebuild ISBN index
+    rebuilIsbnIndex();
   }
   if(id==='scanner') {
     atualizarColégiosSugeridos('');
@@ -1721,25 +1737,50 @@ function atualizarColégiosSugeridos(colegio) {
 
 
 // ═══════════════════════════════════════════════════
-//  CATÁLOGO DINÂMICO (gerenciado em runtime)
+//  CATÁLOGO DINÂMICO (sincronizado via Supabase)
 // ═══════════════════════════════════════════════════
-// LIVROS é o array base; produtos adicionais ficam em LIVROS_EXTRA
-let LIVROS_EXTRA = JSON.parse(localStorage.getItem('cdl_livros_extra') || '[]');
+let LIVROS_EXTRA = [];   // produtos cadastrados no Supabase
+let PRECOS_CDL = {};     // preços editados { sku: preco }
 
 function todosProdutos() {
-  return [...LIVROS, ...LIVROS_EXTRA];
+  // Mescla lista base com extras, aplicando preços editados
+  return [...LIVROS, ...LIVROS_EXTRA].map(l => ({
+    ...l,
+    precoCDL: PRECOS_CDL[l.sku] !== undefined ? PRECOS_CDL[l.sku] : l.precoCDL
+  }));
 }
 
-function salvarExtra() {
-  localStorage.setItem('cdl_livros_extra', JSON.stringify(LIVROS_EXTRA));
-  // Rebuild ISBN_INDEX
+async function carregarProdutosExtra() {
+  try {
+    const res = await sbFetch('produtos_extra?select=*&order=nome');
+    if (!res.ok) return;
+    const data = await res.json();
+    LIVROS_EXTRA = data.map(r => ({
+      sku: r.sku, nome: r.nome, isbn: r.isbn, tipo: r.tipo || 'Livro',
+      precoCapa: parseFloat(r.preco_capa) || 0,
+      precoCDL: parseFloat(r.preco_cdl) || 0
+    }));
+  } catch(e) {}
+}
+
+async function carregarPrecosCDL() {
+  try {
+    const res = await sbFetch('precos_cdl?select=sku,preco_cdl');
+    if (!res.ok) return;
+    const data = await res.json();
+    PRECOS_CDL = {};
+    data.forEach(r => PRECOS_CDL[r.sku] = parseFloat(r.preco_cdl));
+  } catch(e) {}
+}
+
+function rebuilIsbnIndex() {
   todosProdutos().forEach(l => { if(l.isbn) ISBN_INDEX[l.isbn] = l; });
 }
 
 // ═══════════════════════════════════════════════════
 //  CADASTRO DE PRODUTO
 // ═══════════════════════════════════════════════════
-function cadastrarProduto() {
+async function cadastrarProduto() {
   const sku = parseInt(document.getElementById('prod-sku').value);
   const nome = document.getElementById('prod-nome').value.trim();
   const isbn = document.getElementById('prod-isbn').value.replace(/\D/g,'') || null;
@@ -1754,28 +1795,34 @@ function cadastrarProduto() {
   if (todos.find(l => l.sku === sku)) { showToast('SKU já cadastrado!', 'error'); return; }
   if (isbn && todos.find(l => l.isbn === isbn)) { showToast('ISBN já cadastrado!', 'error'); return; }
 
-  const novo = { sku, nome, isbn, tipo, precoCapa, precoCDL };
-  LIVROS_EXTRA.push(novo);
-  salvarExtra();
+  const btn = document.querySelector('#sec-produtos .btn-primary.success');
+  btn.disabled = true; btn.textContent = '⏳ Salvando...';
 
-  // Estoque inicial
-  if (qtd > 0) {
-    estoque[sku] = qtd;
-    upsertEstoque(sku, qtd).catch(() => {});
-  } else {
-    estoque[sku] = 0;
+  try {
+    // Salvar no Supabase
+    const res = await sbFetch('produtos_extra', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates,return=representation',
+      body: JSON.stringify({ sku, nome, isbn, tipo, preco_capa: precoCapa, preco_cdl: precoCDL })
+    });
+    if (!res.ok) throw new Error();
+
+    LIVROS_EXTRA.push({ sku, nome, isbn, tipo, precoCapa, precoCDL });
+    if (isbn) ISBN_INDEX[isbn] = todosProdutos().find(l => l.sku === sku);
+
+    if (qtd > 0) { estoque[sku] = qtd; await upsertEstoque(sku, qtd); }
+    else estoque[sku] = 0;
+
+    ['prod-sku','prod-nome','prod-isbn','prod-preco-capa','prod-preco-cdl'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('prod-qtd').value = 0;
+    document.getElementById('prod-tipo').value = 'Livro';
+
+    populateSelects(); renderEstoque(); updateStats(); populateRelProduto();
+    showToast(`"${nome}" cadastrado com sucesso! ✓`, 'success');
+  } catch(e) {
+    showToast('Erro ao cadastrar. Tente novamente.', 'error');
   }
-
-  // Limpar form
-  ['prod-sku','prod-nome','prod-isbn','prod-preco-capa','prod-preco-cdl'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('prod-qtd').value = 0;
-  document.getElementById('prod-tipo').value = 'Livro';
-
-  populateSelects();
-  renderEstoque();
-  updateStats();
-  populateRelProduto();
-  showToast(`"${nome}" cadastrado com sucesso! ✓`, 'success');
+  btn.disabled = false; btn.textContent = '✔ Cadastrar Produto';
 }
 
 // ═══════════════════════════════════════════════════
@@ -1861,25 +1908,31 @@ async function confirmarImportacao() {
 
   for (const r of dadosImportacao) {
     if (todos.find(l => l.sku === r.sku)) { ignorados++; continue; }
-    const { qtd, ...prod } = r;
-    if (!prod.isbn) prod.isbn = null;
-    LIVROS_EXTRA.push(prod);
-    estoque[r.sku] = r.qtd || 0;
-    if (r.qtd > 0) await upsertEstoque(r.sku, r.qtd).catch(()=>{});
-    importados++;
+    const prod = { sku: r.sku, nome: r.nome, isbn: r.isbn||null, tipo: r.tipo||'Livro',
+      preco_capa: r.precoCapa, preco_cdl: r.precoCDL };
+    try {
+      const res = await sbFetch('produtos_extra', {
+        method: 'POST',
+        prefer: 'resolution=merge-duplicates,return=representation',
+        body: JSON.stringify(prod)
+      });
+      if (!res.ok) { ignorados++; continue; }
+      LIVROS_EXTRA.push({ sku: r.sku, nome: r.nome, isbn: r.isbn||null,
+        tipo: r.tipo||'Livro', precoCapa: r.precoCapa, precoCDL: r.precoCDL });
+      estoque[r.sku] = r.qtd || 0;
+      if (r.qtd > 0) await upsertEstoque(r.sku, r.qtd).catch(()=>{});
+      importados++;
+    } catch(e) { ignorados++; }
   }
 
-  salvarExtra();
-  populateSelects();
-  renderEstoque();
-  updateStats();
-  populateRelProduto();
+  rebuilIsbnIndex();
+  populateSelects(); renderEstoque(); updateStats(); populateRelProduto();
 
   btn.disabled = false; btn.textContent = '✔ Importar Produtos';
   document.getElementById('import-preview').style.display = 'none';
   document.getElementById('prod-file').value = '';
   dadosImportacao = [];
-  showToast(`${importados} produto(s) importado(s)${ignorados ? `, ${ignorados} ignorado(s) (SKU duplicado)` : ''}! ✓`, 'success');
+  showToast(`${importados} produto(s) importado(s)${ignorados ? `, ${ignorados} ignorado(s)` : ''}! ✓`, 'success');
 }
 
 // ═══════════════════════════════════════════════════
