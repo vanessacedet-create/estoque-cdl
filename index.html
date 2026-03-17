@@ -1571,27 +1571,42 @@ function onScannerKey(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
     const val = document.getElementById('scanner-input').value.trim();
-    if (val.length >= 8) processarISBN(val);
+    if (val.length >= 1) processarISBN(val);
   }
 }
 
 function onScannerInput() {
   clearTimeout(scannerTimer);
   const val = document.getElementById('scanner-input').value.trim();
+  // Disparar automaticamente só para códigos longos (ISBN/EAN com 13 dígitos)
   if (val.length >= 13) {
     scannerTimer = setTimeout(() => processarISBN(val), 120);
   }
 }
 
-function processarISBN(isbn) {
-  isbn = isbn.replace(/\D/g, '');
+function processarISBN(codigoRaw) {
+  const codigo = codigoRaw.trim();
   document.getElementById('scanner-input').value = '';
-  const livro = ISBN_INDEX[isbn];
   const fb = document.getElementById('scanner-feedback');
+
+  // Buscar por código exato primeiro
+  let livro = ISBN_INDEX[codigo];
+
+  // Se não encontrou, tentar sem caracteres não numéricos (para ISBN/EAN lidos pelo scanner)
+  if (!livro) {
+    const codigoNumerico = codigo.replace(/\D/g, '');
+    if (codigoNumerico) livro = ISBN_INDEX[codigoNumerico];
+  }
+
+  // Se ainda não encontrou, buscar em todosProdutos() pelo isbn
+  if (!livro) {
+    livro = todosProdutos().find(l => l.isbn === codigo ||
+      (l.isbn && l.isbn.replace(/\D/g,'') === codigo.replace(/\D/g,'')));
+  }
 
   if (!livro) {
     fb.style.background = 'var(--red-light)'; fb.style.color = 'var(--red)';
-    fb.innerHTML = `❌ ISBN não encontrado: <b>${isbn}</b>`;
+    fb.innerHTML = `❌ Código não encontrado: <b>${codigo}</b>`;
     document.getElementById('scanner-qtd-wrap').style.display = 'none';
     return;
   }
