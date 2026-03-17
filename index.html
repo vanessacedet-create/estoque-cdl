@@ -605,7 +605,7 @@ CREATE TABLE historico (
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>SKU</th><th>Título</th><th>ISBN</th><th>Tipo</th><th>Preço CDL</th><th>Estoque</th><th>Status</th><th>Ações</th></tr></thead>
+        <thead><tr><th>SKU</th><th>Título</th><th>ISBN / EAN / Código</th><th>Tipo</th><th onclick="toggleSort('preco')" style="cursor:pointer;user-select:none" id="th-preco">Preço CDL <span id="sort-preco-icon">↕</span></th><th onclick="toggleSort('estoque')" style="cursor:pointer;user-select:none" id="th-estoque">Estoque <span id="sort-estoque-icon">↕</span></th><th>Status</th><th>Ações</th></tr></thead>
         <tbody id="tbody-estoque"></tbody>
       </table>
     </div>
@@ -742,8 +742,8 @@ CREATE TABLE historico (
           <input type="text" id="prod-nome" placeholder="Nome do produto">
         </div>
         <div class="form-group">
-          <label>ISBN</label>
-          <input type="text" id="prod-isbn" placeholder="Ex: 9786585310123" maxlength="13">
+          <label>ISBN / EAN / Código</label>
+          <input type="text" id="prod-isbn" placeholder="Ex: 9786585310123 ou código livre">
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -879,8 +879,8 @@ CREATE TABLE historico (
       </div>
     </div>
     <div class="form-group">
-      <label>ISBN</label>
-      <input type="text" id="edit-prod-isbn" maxlength="13" placeholder="9786585310123">
+      <label>ISBN / EAN / Código</label>
+      <input type="text" id="edit-prod-isbn" placeholder="Ex: 9786585310123 ou código livre">
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -1114,6 +1114,30 @@ async function salvarEstoqueInicial() {
 // ═══════════════════════════════════════════════════
 //  ESTOQUE TABLE
 // ═══════════════════════════════════════════════════
+let sortEstoque = { col: null, dir: 1 }; // col: 'preco' | 'estoque', dir: 1 asc / -1 desc
+
+function toggleSort(col) {
+  if (sortEstoque.col === col) {
+    sortEstoque.dir *= -1;
+  } else {
+    sortEstoque.col = col;
+    sortEstoque.dir = col === 'estoque' ? -1 : 1; // estoque começa maior→menor
+  }
+  // Atualizar ícones
+  ['preco','estoque'].forEach(c => {
+    const el = document.getElementById(`sort-${c}-icon`);
+    if (!el) return;
+    if (sortEstoque.col === c) {
+      el.textContent = sortEstoque.dir === 1 ? ' ↑' : ' ↓';
+      el.style.color = 'var(--gold)';
+    } else {
+      el.textContent = ' ↕';
+      el.style.color = '';
+    }
+  });
+  renderEstoque();
+}
+
 function renderEstoque() {
   const q = (document.getElementById('search-estoque').value||'').toLowerCase();
   const f = document.getElementById('filter-estoque').value;
@@ -1127,6 +1151,14 @@ function renderEstoque() {
     if (fp !== 'todos' && l.precoCDL !== parseFloat(fp)) return false;
     return true;
   });
+
+  // Ordenação
+  if (sortEstoque.col === 'preco') {
+    livros.sort((a, b) => (a.precoCDL - b.precoCDL) * sortEstoque.dir);
+  } else if (sortEstoque.col === 'estoque') {
+    livros.sort((a, b) => ((estoque[a.sku]||0) - (estoque[b.sku]||0)) * sortEstoque.dir);
+  }
+
   const tbody = document.getElementById('tbody-estoque');
   if (!livros.length) { tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="emoji">📭</div><p>Nenhum produto encontrado</p></div></td></tr>`; return; }
   tbody.innerHTML = livros.map(l => {
@@ -1210,7 +1242,7 @@ async function salvarEdicaoProduto() {
   if (!skuEmEdicao) return;
   const nome = document.getElementById('edit-prod-nome').value.trim();
   const tipo = document.getElementById('edit-prod-tipo').value;
-  const isbn = document.getElementById('edit-prod-isbn').value.replace(/\D/g,'') || null;
+  const isbn = document.getElementById('edit-prod-isbn').value.trim() || null;
   const precoCapa = parseFloat(document.getElementById('edit-prod-preco-capa').value) || 0;
   const precoCDL = parseFloat(document.getElementById('edit-prod-preco-cdl').value) || 0;
 
@@ -1841,7 +1873,7 @@ function rebuilIsbnIndex() {
 async function cadastrarProduto() {
   const sku = parseInt(document.getElementById('prod-sku').value);
   const nome = document.getElementById('prod-nome').value.trim();
-  const isbn = document.getElementById('prod-isbn').value.replace(/\D/g,'') || null;
+  const isbn = document.getElementById('prod-isbn').value.trim() || null;
   const tipo = document.getElementById('prod-tipo').value;
   const precoCapa = parseFloat(document.getElementById('prod-preco-capa').value) || 0;
   const precoCDL = parseFloat(document.getElementById('prod-preco-cdl').value) || 0;
