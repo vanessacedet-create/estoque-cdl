@@ -1567,24 +1567,31 @@ function resetarFeedback() {
 }
 
 // ── Leitura do código
+let scanProcessando = false;
+
 function onScannerKey(e) {
   if (e.key === 'Enter') {
     e.preventDefault();
     const val = document.getElementById('scanner-input').value.trim();
-    if (val.length >= 1) processarISBN(val);
+    if (val.length >= 1 && !scanProcessando) processarISBN(val);
   }
 }
 
 function onScannerInput() {
   clearTimeout(scannerTimer);
   const val = document.getElementById('scanner-input').value.trim();
-  // Disparar automaticamente só para códigos longos (ISBN/EAN com 13 dígitos)
-  if (val.length >= 13) {
-    scannerTimer = setTimeout(() => processarISBN(val), 120);
+  if (val.length >= 13 && !scanProcessando) {
+    scannerTimer = setTimeout(() => {
+      const atual = document.getElementById('scanner-input').value.trim();
+      if (atual.length >= 13) processarISBN(atual);
+    }, 120);
   }
 }
 
 function processarISBN(codigoRaw) {
+  if (scanProcessando) return;
+  scanProcessando = true;
+  setTimeout(() => { scanProcessando = false; }, 500);
   const codigo = codigoRaw.trim();
   document.getElementById('scanner-input').value = '';
   const fb = document.getElementById('scanner-feedback');
