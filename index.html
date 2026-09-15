@@ -942,6 +942,20 @@ function salvarConfig() {
   document.getElementById('login-screen').classList.add('open');
 }
 // ── Autenticação
+function salvarSessao(data, email) {
+  localStorage.setItem('cdl_token', data.access_token);
+  if (data.refresh_token) localStorage.setItem('cdl_refresh_token', data.refresh_token);
+  localStorage.setItem('cdl_user_email', email);
+  SB_TOKEN = data.access_token;
+}
+
+function limparSessao() {
+  localStorage.removeItem('cdl_token');
+  localStorage.removeItem('cdl_refresh_token');
+  localStorage.removeItem('cdl_user_email');
+  SB_TOKEN = '';
+}
+
 async function fazerLogin() {
   const email = document.getElementById('login-email').value.trim();
   const senha = document.getElementById('login-senha').value;
@@ -950,30 +964,45 @@ async function fazerLogin() {
   errEl.textContent = '';
   if (!email || !senha) { errEl.textContent = 'Preencha e-mail e senha.'; return; }
   btn.textContent = 'Entrando...'; btn.disabled = true;
+
   try {
     const res = await fetch(SB_URL + '/auth/v1/token?grant_type=password', {
       method: 'POST',
       headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: senha })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error_description || data.msg || 'Credenciais inválidas');
-    localStorage.setItem('cdl_token', data.access_token);
-    localStorage.setItem('cdl_user_email', email);
-    SB_TOKEN = data.access_token;
-    document.getElementById('login-screen').classList.remove('open');
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const mensagem = data.error_description || data.msg || data.message;
+      if (res.status === 400 || res.status === 401) {
+        throw new Error(mensagem || 'E-mail ou senha incorretos.');
+      }
+      throw new Error('Não foi possível acessar o servidor de login. Tente novamente em instantes.');
+    }
+
+    salvarSessao(data, email);
     document.getElementById('header-usuario').textContent = email.split('@')[0];
-    await iniciar();
+
+    try {
+      await iniciar();
+      document.getElementById('login-screen').classList.remove('open');
+    } catch (erroDados) {
+      limparSessao();
+      document.getElementById('loading-screen').classList.remove('open');
+      document.getElementById('login-screen').classList.add('open');
+      throw new Error('Login aceito, mas não foi possível carregar o estoque. Verifique se o banco Supabase está ativo.');
+    }
   } catch(e) {
     errEl.textContent = e.message || 'Erro ao fazer login. Tente novamente.';
+  } finally {
+    btn.textContent = 'Entrar →';
+    btn.disabled = false;
   }
-  btn.textContent = 'Entrar →'; btn.disabled = false;
 }
 
 function fazerLogout() {
-  localStorage.removeItem('cdl_token');
-  localStorage.removeItem('cdl_user_email');
-  SB_TOKEN = '';
+  limparSessao();
   document.getElementById('header-usuario').textContent = '';
   document.getElementById('login-email').value = '';
   document.getElementById('login-senha').value = '';
@@ -2375,23 +2404,52 @@ async function confirmarEstoquePlanilha() {
 //  INICIALIZAÇÃO
 // ═══════════════════════════════════════════════════
 const savedToken = localStorage.getItem('cdl_token');
+const savedRefreshToken = localStorage.getItem('cdl_refresh_token');
 const savedEmail = localStorage.getItem('cdl_user_email');
 
-if(savedToken){
-  // Sessão salva — esconder login e tentar entrar direto
+async function restaurarSessao() {
+  if (!savedToken && !savedRefreshToken) return;
+
   document.getElementById('login-screen').classList.remove('open');
-  SB_TOKEN = savedToken;
-  if(savedEmail) document.getElementById('header-usuario').textContent = savedEmail.split('@')[0];
-  iniciar().catch(()=>{
-    // Token expirado — voltar para login (nunca mostrar setup)
-    localStorage.removeItem('cdl_token');
-    localStorage.removeItem('cdl_user_email');
-    SB_TOKEN = '';
+  SB_TOKEN = savedToken || '';
+  if (savedEmail) document.getElementById('header-usuario').textContent = savedEmail.split('@')[0];
+
+  try {
+    let sessaoValida = false;
+
+    if (savedToken) {
+      const userRes = await fetch(SB_URL + '/auth/v1/user', {
+        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + savedToken }
+      });
+      sessaoValida = userRes.ok;
+    }
+
+    if (!sessaoValida && savedRefreshToken) {
+      const refreshRes = await fetch(SB_URL + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: savedRefreshToken })
+      });
+      const refreshData = await refreshRes.json().catch(() => ({}));
+      if (!refreshRes.ok) throw new Error('Sessão expirada');
+      salvarSessao(refreshData, savedEmail || '');
+      sessaoValida = true;
+    }
+
+    if (!sessaoValida) throw new Error('Sessão expirada');
+    await iniciar();
+  } catch (e) {
+    limparSessao();
+    document.getElementById('loading-screen').classList.remove('open');
     document.getElementById('login-screen').classList.add('open');
-  });
-} else {
-  // Sem sessão — manter login visível (já está open no HTML)
+    document.getElementById('login-error').textContent =
+      e.message === 'Sessão expirada'
+        ? 'Sua sessão expirou. Entre novamente.'
+        : 'Não foi possível carregar o estoque. Verifique se o banco Supabase está ativo.';
+  }
 }
+
+restaurarSessao();
 </script>
 </body>
 </html>
