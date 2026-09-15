@@ -994,7 +994,9 @@ async function fazerLogin() {
       throw new Error('Login aceito, mas não foi possível carregar o estoque. Verifique se o banco Supabase está ativo.');
     }
   } catch(e) {
-    errEl.textContent = e.message || 'Erro ao fazer login. Tente novamente.';
+    errEl.textContent = (e instanceof TypeError && e.message === 'Failed to fetch')
+      ? 'O servidor do estoque está indisponível. O projeto Supabase precisa ser reativado.'
+      : (e.message || 'Erro ao fazer login. Tente novamente.');
   } finally {
     btn.textContent = 'Entrar →';
     btn.disabled = false;
