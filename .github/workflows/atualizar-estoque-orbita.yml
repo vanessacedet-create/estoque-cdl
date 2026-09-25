@@ -18,14 +18,15 @@ jobs:
       - name: Gerar snapshot de estoque
         env:
           SUPABASE_URL: https://kmkynpcjnlkjxkbxguel.supabase.co
-          SUPABASE_ANON_KEY: ${{ secrets.ESTOQUE_SUPABASE_ANON_KEY }}
         run: |
           node <<'NODE'
           const fs = require('fs');
 
           const url = process.env.SUPABASE_URL;
-          const key = process.env.SUPABASE_ANON_KEY;
-          if (!key) throw new Error('Secret ESTOQUE_SUPABASE_ANON_KEY não configurado.');
+          const html = fs.readFileSync('index.html','utf8');
+          const keyMatch = html.match(/let SB_KEY = '([^']+)'/);
+          if (!keyMatch) throw new Error('Chave pública do Estoque CDL não encontrada no index.html.');
+          const key = keyMatch[1];
 
           async function sb(path) {
             const r = await fetch(url + '/rest/v1/' + path, {
