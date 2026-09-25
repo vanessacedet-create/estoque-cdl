@@ -1,6 +1,11 @@
 name: Atualizar estoque público para Órbita
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'catalogo-publico.json'
+      - '.github/workflows/atualizar-estoque-orbita.yml'
   schedule:
     # 12:00 de Brasília (UTC-3)
     - cron: '0 15 * * *'
