@@ -1,0 +1,75 @@
+name: Atualizar estoque público para Órbita
+
+on:
+  schedule:
+    # 12:00 de Brasília (UTC-3)
+    - cron: '0 15 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gerar snapshot de estoque
+        env:
+          SUPABASE_URL: https://kmkynpcjnlkjxkbxguel.supabase.co
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const url = process.env.SUPABASE_URL;
+          const html = fs.readFileSync('index.html','utf8');
+          const keyMatch = html.match(/let SB_KEY = '([^']+)'/);
+          if (!keyMatch) throw new Error('Chave pública do Estoque CDL não encontrada no index.html.');
+          const key = keyMatch[1];
+
+          async function sb(path) {
+            const r = await fetch(url + '/rest/v1/' + path, {
+              headers: { apikey: key, Authorization: 'Bearer ' + key }
+            });
+            if (!r.ok) throw new Error(path + ': HTTP ' + r.status + ' ' + await r.text());
+            return r.json();
+          }
+
+          const base = JSON.parse(fs.readFileSync('catalogo-publico.json','utf8')).livros || [];
+          const [estoque, extras] = await Promise.all([
+            sb('estoque?select=sku,quantidade'),
+            sb('produtos_extra?select=sku,isbn')
+          ]);
+
+          const isbnPorSku = new Map(base.map(x => [String(x.sku), String(x.isbn || '')]));
+          for (const x of extras) if (x.sku && x.isbn) isbnPorSku.set(String(x.sku), String(x.isbn));
+
+          const livros = estoque
+            .map(x => ({
+              sku: x.sku,
+              isbn: isbnPorSku.get(String(x.sku)) || null,
+              quantidade: Number(x.quantidade) || 0
+            }))
+            .filter(x => x.isbn);
+
+          const snapshot = {
+            atualizado_em: new Date().toISOString(),
+            origem: 'Estoque CDL',
+            livros
+          };
+          fs.writeFileSync('estoque-publico.json', JSON.stringify(snapshot, null, 2) + '\n');
+          console.log('Snapshot:', livros.length, 'produtos com ISBN');
+          NODE
+
+      - name: Publicar snapshot
+        run: |
+          if git diff --quiet -- estoque-publico.json; then
+            echo "Sem alterações."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add estoque-publico.json
+          git commit -m "Estoque: atualizar snapshot diário para Órbita"
+          git push
